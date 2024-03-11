@@ -36,6 +36,8 @@ type chatResponse struct {
 	Created int64    `json:"created"`
 	Model   string   `json:"model"`
 	Choices []Choice `json:"choices"`
+	Code    int      `json:"code"`
+	Message string   `json:"message"`
 	Error   *struct {
 		Message string `json:"message"`
 		Type    string `json:"type"`
@@ -53,7 +55,8 @@ type Choice struct {
 
 func completions(ctx *zero.Ctx, uid int64, name, content string, histories []*history) {
 	messages := make([]map[string]string, 0)
-	for _, h := range histories {
+	for hL := len(histories) - 1; hL >= 0; hL-- {
+		h := histories[hL]
 		messages = append(messages, map[string]string{
 			"role":    "user",
 			"content": h.UserContent,
@@ -76,6 +79,11 @@ func completions(ctx *zero.Ctx, uid int64, name, content string, histories []*hi
 		return
 	}
 
+	im := false
+	if c.Key == name {
+		im = c.Imitate
+	}
+
 	payload := chatRequest{
 		Model:       c.Model,
 		Messages:    messages,
@@ -93,12 +101,12 @@ func completions(ctx *zero.Ctx, uid int64, name, content string, histories []*hi
 
 	k, err := Db.key(name)
 	if err != nil {
-		ctx.Send(message.Text("ERROR: ", err))
+		ctx.Send(message.Text("ERROR: key query -> ", err))
 		return
 	}
 
 	h := request.Header
-	h.Set("authorization", k.Content)
+	h.Set("authorization", "Bearer "+k.Content)
 	h.Set("content-type", "application/json")
 
 	response, err := client.Do(request)
@@ -113,17 +121,36 @@ func completions(ctx *zero.Ctx, uid int64, name, content string, histories []*hi
 	}
 
 	ch := make(chan string)
-	defer close(ch)
-
 	go resolve(response, ch)
-	result, err := waitResponse(ch)
-	if err != nil {
-		ctx.Send(message.Text("ERROR: ", err))
-		return
+
+	result := ""
+	if !im {
+		if zero.OnlyPrivate(ctx) {
+			ctx.SendChain(message.Text("正在响应..."))
+		} else {
+			ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text("正在响应..."))
+		}
+
+		result, err = waitResponse(ch)
+		if err != nil {
+			ctx.Send(message.Text("ERROR: ", err))
+			return
+		}
+
+		if zero.OnlyPrivate(ctx) {
+			ctx.SendChain(message.Text(result))
+		} else {
+			ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(result))
+		}
+	} else {
+		result, err = batchResponse(ctx, ch, []string{"!", ".", "?", "！", "。", "？"})
+		if err != nil {
+			ctx.Send(message.Text("ERROR: ", err))
+			return
+		}
 	}
 
-	ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(result))
-	err = Db.addHistory(history{
+	err = Db.saveHistory(history{
 		Timestamp:        time.Now().Unix(),
 		Uid:              uid,
 		Name:             name,
@@ -132,6 +159,44 @@ func completions(ctx *zero.Ctx, uid int64, name, content string, histories []*hi
 	})
 	if err != nil {
 		ctx.Send(message.Text("ERROR: ", err))
+	}
+}
+
+func batchResponse(ctx *zero.Ctx, ch chan string, symbols []string) (result string, err error) {
+	buf := ""
+
+	for {
+		text, ok := <-ch
+		if !ok {
+			if buf != "" {
+				if ctx.Event.IsToMe {
+					ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(buf))
+				} else {
+					ctx.SendChain(message.Text(buf))
+				}
+			}
+			return
+		}
+
+		if strings.HasPrefix(text, "error: ") {
+			return "", errors.New(strings.TrimPrefix(text, "error: "))
+		}
+
+		text = strings.TrimPrefix(text, "text: ")
+		result += text
+
+		buf += text
+		for _, symbol := range symbols {
+			index := strings.Index(buf, symbol)
+			if index > 0 {
+				if !zero.OnlyPrivate(ctx) && ctx.Event.IsToMe {
+					ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(buf[:index+len(symbol)]))
+				} else {
+					ctx.SendChain(message.Text(buf[:index+len(symbol)]))
+				}
+				buf = buf[index+len(symbol):]
+			}
+		}
 	}
 }
 
@@ -152,8 +217,10 @@ func waitResponse(ch chan string) (result string, err error) {
 }
 
 func resolve(response *http.Response, ch chan string) {
+	defer close(ch)
 	r := bufio.NewReader(response.Body)
 	before := []byte("data: ")
+	done := []byte("[DONE]")
 	var data []byte
 
 	for {
@@ -177,6 +244,10 @@ func resolve(response *http.Response, ch chan string) {
 
 		var res chatResponse
 		data = bytes.TrimPrefix(data, before)
+		if bytes.Equal(data, done) {
+			return
+		}
+
 		if err = json.Unmarshal(data, &res); err != nil {
 			ch <- fmt.Sprintf("error: %v", err)
 			return
@@ -184,6 +255,11 @@ func resolve(response *http.Response, ch chan string) {
 
 		if res.Error != nil {
 			ch <- fmt.Sprintf("error: %s", res.Error.Message)
+			return
+		}
+
+		if res.Code > 0 {
+			ch <- fmt.Sprintf("error: %s", res.Message)
 			return
 		}
 

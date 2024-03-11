@@ -23,9 +23,11 @@ type key struct {
 type config struct {
 	Timestamp int64  `db:"timestamp"`
 	Proxies   string `db:"proxies"`
-	BaseUrl   string `db:"base-url"`
+	BaseUrl   string `db:"base_url"`
 	Key       string `db:"key"`
 	Model     string `db:"model"`
+	Imitate   bool   `db:"imitate"` // 模仿模式
+
 }
 
 type history struct {
@@ -72,13 +74,10 @@ var (
 	})
 )
 
-func (d *db) addKey(name, content string) error {
+func (d *db) saveKey(k key) error {
 	d.Lock()
 	defer d.Unlock()
-	return d.sql.Insert("key", &key{
-		Name:    name,
-		Content: content,
-	})
+	return d.sql.Insert("key", &k)
 }
 
 func (d *db) delKey(name string) error {
@@ -93,12 +92,6 @@ func (d *db) keys() ([]*key, error) {
 	return sql.FindAll[key](d.sql, "key", "")
 }
 
-func (d *db) findHistory(uid int64, name string, count int) ([]*history, error) {
-	d.Lock()
-	defer d.Unlock()
-	return sql.FindAll[history](d.sql, "history", "uid = "+strconv.FormatInt(uid, 10)+" and name = '"+name+"' limit "+strconv.Itoa(count))
-}
-
 func (d *db) config() config {
 	d.Lock()
 	defer d.Unlock()
@@ -108,26 +101,38 @@ func (d *db) config() config {
 		Model:     "gpt-4-turbo",
 		Key:       "gpt",
 	}
-	_ = d.sql.Find("config", &c, "")
+	_ = d.sql.Find("config", &c, " where 1=1")
 	return c
 }
 
 func (d *db) updateConfig(c config) error {
 	d.Lock()
 	defer d.Unlock()
-	return d.sql.Insert("config", c)
+	return d.sql.Insert("config", &c)
 }
 
-func (d *db) addHistory(h history) error {
+func (d *db) saveHistory(h history) error {
 	d.Lock()
 	defer d.Unlock()
-	return d.sql.Insert("history", h)
+	return d.sql.Insert("history", &h)
+}
+
+func (d *db) findHistory(uid int64, name string, count int) ([]*history, error) {
+	d.Lock()
+	defer d.Unlock()
+	return sql.FindAll[history](d.sql, "history", "where uid = "+strconv.FormatInt(uid, 10)+" and name = '"+name+"' order by timestamp desc limit "+strconv.Itoa(count))
+}
+
+func (d *db) cleanHistories(uid int64, name string) error {
+	d.Lock()
+	defer d.Unlock()
+	return d.sql.Del("history", "where uid = "+strconv.FormatInt(uid, 10)+" and name = '"+name+"'")
 }
 
 func (d *db) key(name string) (*key, error) {
 	d.Lock()
 	defer d.Unlock()
 	var k key
-	err := d.sql.Find("key", &k, "name = '"+name+"'")
+	err := d.sql.Find("key", &k, "where name = '"+name+"'")
 	return &k, err
 }
