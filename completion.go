@@ -143,7 +143,7 @@ func completions(ctx *zero.Ctx, uid int64, name, content string, histories []*hi
 			ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(result))
 		}
 	} else {
-		result, err = batchResponse(ctx, ch, []string{"!", ".", "?", "！", "。", "？"})
+		result, err = batchResponse(ctx, ch, []string{"!", ".", "?", "！", "。", "？"}, []string{".", "。"})
 		if err != nil {
 			ctx.Send(message.Text("ERROR: ", err))
 			return
@@ -162,7 +162,7 @@ func completions(ctx *zero.Ctx, uid int64, name, content string, histories []*hi
 	}
 }
 
-func batchResponse(ctx *zero.Ctx, ch chan string, symbols []string) (result string, err error) {
+func batchResponse(ctx *zero.Ctx, ch chan string, symbols []string, igSymbols []string) (result string, err error) {
 	buf := ""
 
 	for {
@@ -189,10 +189,14 @@ func batchResponse(ctx *zero.Ctx, ch chan string, symbols []string) (result stri
 		for _, symbol := range symbols {
 			index := strings.Index(buf, symbol)
 			if index > 0 {
+				l := 0
+				if !Contains(igSymbols, symbol) {
+					l = len(symbol)
+				}
 				if !zero.OnlyPrivate(ctx) && ctx.Event.IsToMe {
-					ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(buf[:index+len(symbol)]))
+					ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(buf[:index+l]))
 				} else {
-					ctx.SendChain(message.Text(buf[:index+len(symbol)]))
+					ctx.SendChain(message.Text(buf[:index+l]))
 				}
 				buf = buf[index+len(symbol):]
 			}
@@ -307,4 +311,13 @@ func newClient(proxies string) (*http.Client, error) {
 	}
 
 	return client, nil
+}
+
+func Contains[T comparable](list []T, item T) bool {
+	for _, it := range list {
+		if it == item {
+			return true
+		}
+	}
+	return false
 }

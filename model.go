@@ -27,7 +27,7 @@ type config struct {
 	Key       string `db:"key"`
 	Model     string `db:"model"`
 	Imitate   bool   `db:"imitate"` // 模仿模式
-
+	Freq      int    `db:"freq"`    // 模仿模式自动应答频率0~100
 }
 
 type history struct {
@@ -100,8 +100,9 @@ func (d *db) config() config {
 		BaseUrl:   "https://api.openai.com",
 		Model:     "gpt-4-turbo",
 		Key:       "gpt",
+		Freq:      35,
 	}
-	_ = d.sql.Find("config", &c, " where 1=1")
+	_ = d.sql.Find("config", &c, "")
 	return c
 }
 

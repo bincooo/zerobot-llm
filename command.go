@@ -17,11 +17,13 @@ var (
 	engine = control.Register("gpt", &ctrl.Options[*zero.Ctx]{
 		DisableOnDefault: false,
 		Brief:            "gpt",
-		Help: "/config         查看全局\n" +
-			"/config.key     默认gpt key\n" +
+		Help: "/config         查看全局配置\n" +
+			"/config.key     默认gpt key (key name)\n" +
 			"/config.model   默认模型类型\n" +
 			"/config.baseUrl 默认请求地址\n" +
 			"/config.proxies 默认代理\n" +
+			"/config.Im      默认开启自由发言 (true|false)\n" +
+			"/config.freq    自由发言频率 (0~100)\n" +
 			"/keys          查看所有key\n" +
 			"/set-key       添加｜修改key (私聊)\n" +
 			"/del-key       删除key\n" +
@@ -30,11 +32,12 @@ var (
 		PrivateDataFolder: "gpt",
 	})
 
-	cacheChatMessages []string
+	cacheChatMessages map[int64][]string
 	fmtMessage        = "[%s] %s > %s"
 )
 
 func init() {
+	cacheChatMessages = make(map[int64][]string)
 	engine.OnMessage(onDb).Handle(func(ctx *zero.Ctx) {
 		if zero.OnlyToMe(ctx) {
 			return
@@ -51,28 +54,28 @@ func init() {
 
 		plainText := strings.TrimSpace(ctx.ExtractPlainText())
 		if plainText != "" {
+			uid := ctx.Event.UserID
+			if ctx.Event.GroupID > 0 {
+				uid = ctx.Event.GroupID
+			}
+
 			date := time.Now().Format("2006-01-02 15:04:05")
-			cacheChatMessages = append(cacheChatMessages, fmt.Sprintf(fmtMessage, ctx.Event.Sender.NickName, date, plainText))
+			cacheChatMessages[uid] = append(cacheChatMessages[uid], fmt.Sprintf(fmtMessage, ctx.Event.Sender.NickName, date, plainText))
 			// 100条
 			if l := len(cacheChatMessages); l > 100 {
-				cacheChatMessages = cacheChatMessages[l-100:]
+				cacheChatMessages[uid] = cacheChatMessages[uid][l-100:]
 			}
 
 			// 随机回复
-			if rand.Intn(100) > 90 {
-				uid := ctx.Event.UserID
-				if ctx.Event.GroupID > 0 {
-					uid = ctx.Event.GroupID
-				}
-
+			if rand.Intn(100) < c.Freq {
 				histories, e := Db.findHistory(uid, k.Name, 100)
 				if e != nil && !IsSqlNull(e) {
 					logrus.Error(e)
 					return
 				}
 
-				completions(ctx, uid, k.Name, strings.Join(cacheChatMessages, "\n\n"), histories)
-				cacheChatMessages = nil
+				completions(ctx, uid, k.Name, strings.Join(cacheChatMessages[uid], "\n\n"), histories)
+				cacheChatMessages[uid] = nil
 			}
 		}
 	})
@@ -115,8 +118,11 @@ func init() {
 		if c.Imitate {
 			date := time.Now().Format("2006-01-02 15:04:05")
 			plainText = fmt.Sprintf(fmtMessage, name, date, plainText)
+			cacheChatMessages[uid] = append(cacheChatMessages[uid], plainText)
+			plainText = strings.Join(cacheChatMessages[uid], "\n\n")
 		}
 		completions(ctx, uid, c.Key, plainText, histories)
+		cacheChatMessages[uid] = nil
 	})
 
 	engine.OnRegex(`^/chat\s+(\S+)\s*(.*)$`, onDb).SetBlock(true).Handle(func(ctx *zero.Ctx) {
@@ -206,7 +212,7 @@ func init() {
 			ctx.Send(message.Text(content))
 		})
 
-	engine.OnRegex(`^/config\.proxies\s+(\S+)$`, zero.AdminPermission, onDb).SetBlock(true).
+	engine.OnRegex(`^/config\.proxies\s*(\S*)$`, zero.AdminPermission, onDb).SetBlock(true).
 		Handle(func(ctx *zero.Ctx) {
 			matched := ctx.State["regex_matched"].([]string)
 			c := Db.config()
@@ -277,6 +283,30 @@ func init() {
 			}
 
 			ctx.Send(message.Text("已" + tex + "模仿模式。"))
+		})
+
+	engine.OnRegex(`^/config.freq\s(\d+)`, zero.AdminPermission, onDb).SetBlock(true).
+		Handle(func(ctx *zero.Ctx) {
+			matched := ctx.State["regex_matched"].([]string)
+			c := Db.config()
+			i, err := strconv.Atoi(matched[1])
+			if err != nil {
+				ctx.Send(message.Text("ERROR: ", err))
+				return
+			}
+
+			if 0 > i && i > 100 {
+				ctx.Send(message.Text("取值范围限制在0~100！"))
+				return
+			}
+
+			c.Freq = i
+			if err = Db.updateConfig(c); err != nil {
+				ctx.Send(message.Text("ERROR: ", err))
+				return
+			}
+
+			ctx.Send(message.Text("已修改回复频率为 " + matched[1] + "%。"))
 		})
 }
 
