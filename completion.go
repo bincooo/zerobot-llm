@@ -168,7 +168,7 @@ func batchResponse(ctx *zero.Ctx, ch chan string, symbols []string, igSymbols []
 	for {
 		text, ok := <-ch
 		if !ok {
-			if buf != "" {
+			if strings.TrimSpace(buf) != "" {
 				if ctx.Event.IsToMe {
 					ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(buf))
 				} else {
