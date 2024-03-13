@@ -99,8 +99,8 @@ func (d *db) config() config {
 		Timestamp: time.Now().Unix(),
 		BaseUrl:   "https://api.openai.com",
 		Model:     "gpt-4-turbo",
-		Key:       "gpt",
-		Freq:      35,
+		Key:       "auto",
+		Freq:      25,
 	}
 	_ = d.sql.Find("config", &c, "")
 	return c

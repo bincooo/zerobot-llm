@@ -209,6 +209,7 @@ func init() {
 			content += "model: " + c.Model + "\n"
 			content += "key: " + c.Key + "\n"
 			content += "imitate: " + strconv.FormatBool(c.Imitate) + "\n"
+			content += "freq: " + strconv.Itoa(c.Freq) + "%\n"
 			ctx.Send(message.Text(content))
 		})
 
