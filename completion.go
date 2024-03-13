@@ -143,7 +143,7 @@ func completions(ctx *zero.Ctx, uid int64, name, content string, histories []*hi
 			ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(result))
 		}
 	} else {
-		result, err = batchResponse(ctx, ch, []string{"!", ".", "?", "！", "。", "？"}, []string{".", "。"})
+		result, err = batchResponse(ctx, ch, []string{"!", ".", "?", "！", "。", "？", "\n\n"}, []string{".", "。", "\n\n"})
 		if err != nil {
 			ctx.Send(message.Text("ERROR: ", err))
 			return
