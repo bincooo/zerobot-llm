@@ -136,7 +136,24 @@ func generation(ctx *zero.Ctx, text string) {
 	}
 
 	d := list[0].(map[string]interface{})
-	ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Image(d["url"].(string)))
+	response, err = client.Get(d["url"].(string))
+	if err != nil {
+		ctx.Send(message.Text("ERROR: 下载图片失败 > ", err))
+		return
+	}
+
+	if response.StatusCode != http.StatusOK {
+		ctx.Send(message.Text("ERROR: ", response.Status))
+		return
+	}
+
+	data, err = io.ReadAll(response.Body)
+	if err != nil {
+		ctx.Send(message.Text("ERROR: 下载图片失败 > ", err))
+		return
+	}
+
+	ctx.SendChain(message.Reply(ctx.Event.MessageID), message.ImageBytes(data))
 }
 
 // 对话

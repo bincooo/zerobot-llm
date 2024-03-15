@@ -223,8 +223,8 @@ func init() {
 			content += "key: " + c.Key + "\n"
 			content += "imitate: " + strconv.FormatBool(c.Imitate) + "\n"
 			content += "freq: " + strconv.Itoa(c.Freq) + "%\n"
-			content += "paintUrl: " + c.PaintUrl + "%\n"
-			content += "paintKey: " + c.PaintKey + "%\n"
+			content += "paintUrl: " + c.PaintUrl + "\n"
+			content += "paintKey: " + c.PaintKey + "\n"
 			ctx.Send(message.Text(content))
 		})
 
