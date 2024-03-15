@@ -12,6 +12,7 @@ import (
 	"github.com/wdvxdr1123/ZeroBot/message"
 	"golang.org/x/net/proxy"
 	"io"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
@@ -125,13 +126,15 @@ func completions(ctx *zero.Ctx, uid int64, name, content string, histories []*hi
 
 	result := ""
 	if !im {
+		var messageID message.MessageID
 		if zero.OnlyPrivate(ctx) {
-			ctx.SendChain(message.Text("正在响应..."))
+			messageID = ctx.SendChain(message.Text("正在响应..."))
 		} else {
-			ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text("正在响应..."))
+			messageID = ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text("正在响应..."))
 		}
 
 		result, err = waitResponse(ch)
+		ctx.DeleteMessage(messageID)
 		if err != nil {
 			ctx.Send(message.Text("ERROR: ", err))
 			return
@@ -186,6 +189,12 @@ func batchResponse(ctx *zero.Ctx, ch chan string, symbols []string, igSymbols []
 		result += text
 
 		buf += text
+
+		toAt := ctx.Event.IsToMe
+		if toAt { // 减少At别人
+			toAt = rand.Intn(2) < 1
+		}
+
 		for _, symbol := range symbols {
 			index := strings.Index(buf, symbol)
 			if index > 0 {
@@ -193,7 +202,7 @@ func batchResponse(ctx *zero.Ctx, ch chan string, symbols []string, igSymbols []
 				if !Contains(igSymbols, symbol) {
 					l = len(symbol)
 				}
-				if !zero.OnlyPrivate(ctx) && ctx.Event.IsToMe {
+				if !zero.OnlyPrivate(ctx) && toAt {
 					ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(buf[:index+l]))
 				} else {
 					ctx.SendChain(message.Text(buf[:index+l]))

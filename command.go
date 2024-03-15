@@ -190,12 +190,19 @@ func init() {
 				ctx.Send(message.Text("ERROR: ", err))
 				return
 			}
+			c := Db.config()
 			content := "***  keys  ***\n\n"
-			if len(ks) == 0 {
-				content += "   ~ none ~"
-			}
+
+			isEmpty := true
 			for _, k := range ks {
-				content += k.Name + "\n"
+				if c.Key != k.Name {
+					content += k.Name + "\n"
+					isEmpty = false
+				}
+			}
+
+			if isEmpty {
+				content += "   ~ none ~"
 			}
 			ctx.Send(message.Text(content))
 		})
