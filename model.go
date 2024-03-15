@@ -28,6 +28,7 @@ type config struct {
 	Model     string `db:"model"`
 	Imitate   bool   `db:"imitate"` // 模仿模式
 	Freq      int    `db:"freq"`    // 模仿模式自动应答频率0~100
+	PaintUrl  string `db:"paint_url"`
 	PaintKey  string `db:"paint_key"`
 }
 
@@ -99,6 +100,7 @@ func (d *db) config() config {
 	var c = config{
 		Timestamp: time.Now().Unix(),
 		BaseUrl:   "https://api.openai.com",
+		PaintUrl:  "https://api.openai.com",
 		PaintKey:  "",
 		Model:     "gpt-4-turbo",
 		Key:       "auto",

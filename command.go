@@ -169,7 +169,7 @@ func init() {
 		completions(ctx, uid, matched[1], msg, histories)
 	})
 
-	engine.OnRegex(`^/set-key\s+(\S+)\s+(\S+)$`, zero.AdminPermission, zero.OnlyPrivate, onDb).SetBlock(true).
+	engine.OnRegex(`^/set-key\s+(\S+)\s+(\S+)$`, zero.AdminPermission, onDb).SetBlock(true).
 		Handle(func(ctx *zero.Ctx) {
 			matched := ctx.State["regex_matched"].([]string)
 			if err := Db.saveKey(key{Name: matched[1], Content: matched[2]}); err != nil {
@@ -223,6 +223,8 @@ func init() {
 			content += "key: " + c.Key + "\n"
 			content += "imitate: " + strconv.FormatBool(c.Imitate) + "\n"
 			content += "freq: " + strconv.Itoa(c.Freq) + "%\n"
+			content += "paintUrl: " + c.PaintUrl + "%\n"
+			content += "paintKey: " + c.PaintKey + "%\n"
 			ctx.Send(message.Text(content))
 		})
 
@@ -321,6 +323,32 @@ func init() {
 			}
 
 			ctx.Send(message.Text("已修改回复频率为 " + matched[1] + "%。"))
+		})
+
+	engine.OnRegex(`^/config\.paintUrl\s+(\S+)$`, zero.AdminPermission, onDb).SetBlock(true).
+		Handle(func(ctx *zero.Ctx) {
+			matched := ctx.State["regex_matched"].([]string)
+			c := Db.config()
+			c.PaintUrl = matched[1]
+			err := Db.updateConfig(c)
+			if err != nil {
+				ctx.Send(message.Text("ERROR: ", err))
+				return
+			}
+			ctx.Send(message.Text("已更新绘画接口。"))
+		})
+
+	engine.OnRegex(`^/config\.paintKey\s+(\S+)$`, zero.AdminPermission, onDb).SetBlock(true).
+		Handle(func(ctx *zero.Ctx) {
+			matched := ctx.State["regex_matched"].([]string)
+			c := Db.config()
+			c.PaintKey = matched[1]
+			err := Db.updateConfig(c)
+			if err != nil {
+				ctx.Send(message.Text("ERROR: ", err))
+				return
+			}
+			ctx.Send(message.Text("已更新绘画 key。"))
 		})
 }
 

@@ -95,7 +95,7 @@ func generation(ctx *zero.Ctx, text string) {
 	}
 
 	marshal, _ := json.Marshal(payload)
-	request, err := http.NewRequest(http.MethodPost, c.BaseUrl+"/v1/images/generations", bytes.NewReader(marshal))
+	request, err := http.NewRequest(http.MethodPost, c.PaintUrl+"/v1/images/generations", bytes.NewReader(marshal))
 	if err != nil {
 		ctx.Send(message.Text("ERROR: ", err))
 		return
