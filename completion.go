@@ -54,6 +54,92 @@ type Choice struct {
 	FinishReason string `json:"finish_reason"`
 }
 
+type ChatGenRequest struct {
+	Model   string `json:"model"`
+	Prompt  string `json:"prompt"`
+	Quality string `json:"quality"`
+	N       int    `json:"n"`
+	Size    string `json:"size"`
+	Style   string `json:"style"`
+}
+
+var (
+	paintModels = []string{"dall-e-3", "pg.dall-e-3"}
+)
+
+// 画图
+func generation(ctx *zero.Ctx, text string) {
+	c := Db.config()
+	k := c.PaintKey
+	if k == "" {
+		ctx.Send(message.Text("ERROR: 绘画key为空"))
+		return
+	}
+
+	m := paintModels[rand.Intn(2)]
+	q := "standard"
+	s := "vivid"
+
+	var payload = ChatGenRequest{
+		Model:   m,
+		Quality: q,
+		Style:   s,
+		Prompt:  text,
+		N:       1,
+	}
+
+	client, err := newClient(c.Proxies)
+	if err != nil {
+		ctx.Send(message.Text("ERROR: ", err))
+		return
+	}
+
+	marshal, _ := json.Marshal(payload)
+	request, err := http.NewRequest(http.MethodPost, c.BaseUrl+"/v1/images/generations", bytes.NewReader(marshal))
+	if err != nil {
+		ctx.Send(message.Text("ERROR: ", err))
+		return
+	}
+
+	h := request.Header
+	h.Set("authorization", "Bearer "+k)
+	h.Set("content-type", "application/json")
+
+	response, err := client.Do(request)
+	if err != nil {
+		ctx.Send(message.Text("ERROR: ", err))
+		return
+	}
+
+	if response.StatusCode != http.StatusOK {
+		ctx.Send(message.Text("ERROR: ", response.Status))
+		return
+	}
+
+	var result map[string]interface{}
+	data, err := io.ReadAll(response.Body)
+	if err = json.Unmarshal(data, &result); err != nil {
+		ctx.Send(message.Text("ERROR: ", response.Status))
+		return
+	}
+
+	if errMessage, ok := result["error"]; ok {
+		msg := errMessage.(map[string]interface{})["message"]
+		ctx.Send(message.Text(fmt.Sprintf("ERROR: %s", msg)))
+		return
+	}
+
+	list := result["data"].([]interface{})
+	if len(list) == 0 {
+		ctx.Send(message.Text("ERROR: 请求失败"))
+		return
+	}
+
+	d := list[0].(map[string]interface{})
+	ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Image(d["url"].(string)))
+}
+
+// 对话
 func completions(ctx *zero.Ctx, uid int64, name, content string, histories []*history) {
 	messages := make([]map[string]string, 0)
 	for hL := len(histories) - 1; hL >= 0; hL-- {

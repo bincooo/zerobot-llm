@@ -125,6 +125,12 @@ func init() {
 		cacheChatMessages[uid] = nil
 	})
 
+	engine.OnPrefix("画", zero.OnlyToMe, onDb).SetBlock(true).Handle(func(ctx *zero.Ctx) {
+		plainText := strings.TrimSpace(ctx.ExtractPlainText())
+		plainText = strings.TrimPrefix(plainText, "画")
+		generation(ctx, plainText)
+	})
+
 	engine.OnRegex(`^/chat\s+(\S+)\s*(.*)$`, onDb).SetBlock(true).Handle(func(ctx *zero.Ctx) {
 		matched := ctx.State["regex_matched"].([]string)
 		uid := ctx.Event.UserID
