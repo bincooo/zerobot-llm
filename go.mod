@@ -7,6 +7,7 @@ require (
 	github.com/FloatTech/sqlite v1.6.2
 	github.com/FloatTech/zbpctrl v1.5.3-0.20230514154630-b74e6fcca380
 	github.com/FloatTech/zbputils v1.7.0
+	github.com/sirupsen/logrus v1.9.0
 	github.com/wdvxdr1123/ZeroBot v1.7.4
 	golang.org/x/net v0.4.0
 )
@@ -32,7 +33,6 @@ require (
 	github.com/mattn/go-isatty v0.0.16 // indirect
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20200410134404-eec4a21b6bb0 // indirect
-	github.com/sirupsen/logrus v1.9.0 // indirect
 	github.com/tidwall/gjson v1.14.4 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect

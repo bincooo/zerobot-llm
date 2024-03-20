@@ -64,7 +64,8 @@ type ChatGenRequest struct {
 }
 
 var (
-	paintModels = []string{"dall-e-3", "pg.dall-e-3"}
+	paintModels     = []string{"dall-e-3", "pg.dall-e-3"}
+	fastErrorPrefix = []byte(`{"message":`)
 )
 
 // 画图
@@ -362,6 +363,19 @@ func resolve(response *http.Response, ch chan string) {
 		data = bytes.TrimPrefix(data, before)
 		if bytes.Equal(data, done) {
 			return
+		}
+
+		// FastGPT 的自定义错误
+		if bytes.HasPrefix(data, fastErrorPrefix) {
+			var obj map[string]interface{}
+			if e := json.Unmarshal(line, &obj); e != nil {
+				ch <- fmt.Sprintf("error: %v", err)
+				return
+			}
+			if msg, ok := obj["message"]; ok && msg != "" {
+				ch <- fmt.Sprintf("error: %s", msg)
+				return
+			}
 		}
 
 		if err = json.Unmarshal(data, &res); err != nil {
