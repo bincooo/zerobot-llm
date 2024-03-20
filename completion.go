@@ -379,7 +379,9 @@ func resolve(response *http.Response, ch chan string) {
 			return
 		}
 
-		ch <- fmt.Sprintf("text: %s", res.Choices[0].Delta.Content)
+		if len(res.Choices) > 0 {
+			ch <- fmt.Sprintf("text: %s", res.Choices[0].Delta.Content)
+		}
 		data = nil
 	}
 }
