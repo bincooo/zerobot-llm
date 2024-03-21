@@ -275,11 +275,11 @@ func batchResponse(ctx *zero.Ctx, ch chan string, symbols []string, igSymbols []
 	for {
 		text, ok := <-ch
 		if !ok {
-			if strings.TrimSpace(buf) != "" {
+			if tex := strings.TrimSpace(buf); tex != "" {
 				if ctx.Event.IsToMe {
-					ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(buf))
+					ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(tex))
 				} else {
-					ctx.SendChain(message.Text(buf))
+					ctx.SendChain(message.Text(tex))
 				}
 			}
 			return
@@ -306,10 +306,12 @@ func batchResponse(ctx *zero.Ctx, ch chan string, symbols []string, igSymbols []
 				if !Contains(igSymbols, symbol) {
 					l = len(symbol)
 				}
-				if !zero.OnlyPrivate(ctx) && toAt {
-					ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(buf[:index+l]))
+
+				tex := strings.TrimSpace(buf[:index+l])
+				if tex != "" && !zero.OnlyPrivate(ctx) && toAt {
+					ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(tex))
 				} else {
-					ctx.SendChain(message.Text(buf[:index+l]))
+					ctx.SendChain(message.Text(tex))
 				}
 				buf = buf[index+len(symbol):]
 			}
