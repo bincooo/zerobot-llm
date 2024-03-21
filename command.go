@@ -10,6 +10,7 @@ import (
 	"math/rand"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -34,6 +35,8 @@ var (
 
 	cacheChatMessages map[int64][]string
 	fmtMessage        = "[%s] %s > %s"
+	messageL          = 20
+	mu                sync.Mutex
 )
 
 func init() {
@@ -59,23 +62,30 @@ func init() {
 				uid = ctx.Event.GroupID
 			}
 
+			mu.Lock()
 			date := time.Now().Format("2006-01-02 15:04:05")
 			cacheChatMessages[uid] = append(cacheChatMessages[uid], fmt.Sprintf(fmtMessage, ctx.Event.Sender.NickName, date, plainText))
 			// 100条
-			if l := len(cacheChatMessages); l > 100 {
-				cacheChatMessages[uid] = cacheChatMessages[uid][l-100:]
+			if l := len(cacheChatMessages); l > messageL {
+				cacheChatMessages[uid] = cacheChatMessages[uid][l-messageL:]
 			}
 
 			// 随机回复
 			if rand.Intn(100) < c.Freq {
-				histories, e := Db.findHistory(uid, k.Name, 100)
+				histories, e := Db.findHistory(uid, k.Name, 50)
 				if e != nil && !IsSqlNull(e) {
 					logrus.Error(e)
+					mu.Unlock()
 					return
 				}
 
-				completions(ctx, uid, k.Name, strings.Join(cacheChatMessages[uid], "\n\n"), histories)
+				messages := cacheChatMessages[uid]
 				cacheChatMessages[uid] = nil
+				mu.Unlock()
+
+				completions(ctx, uid, k.Name, strings.Join(messages, "\n\n"), histories)
+			} else {
+				mu.Unlock()
 			}
 		}
 	})
@@ -115,14 +125,17 @@ func init() {
 			return
 		}
 
+		mu.Lock()
 		if c.Imitate {
 			date := time.Now().Format("2006-01-02 15:04:05")
 			plainText = fmt.Sprintf(fmtMessage, name, date, plainText)
 			cacheChatMessages[uid] = append(cacheChatMessages[uid], plainText)
 			plainText = strings.Join(cacheChatMessages[uid], "\n\n")
 		}
-		completions(ctx, uid, c.Key, plainText, histories)
 		cacheChatMessages[uid] = nil
+		mu.Unlock()
+
+		completions(ctx, uid, c.Key, plainText, histories)
 	})
 
 	engine.OnPrefix("画", zero.OnlyToMe, onDb).SetBlock(true).Handle(func(ctx *zero.Ctx) {
