@@ -8,6 +8,7 @@ import (
 	zero "github.com/wdvxdr1123/ZeroBot"
 	"github.com/wdvxdr1123/ZeroBot/message"
 	"math/rand"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -33,15 +34,26 @@ var (
 		PrivateDataFolder: "gpt",
 	})
 
-	cacheChatMessages map[int64][]string
-	fmtMessage        = "[%s] %s > %s"
-	messageL          = 10
-	historyL          = 50
-	mu                sync.Mutex
+	chatMessages map[int64][]cacheMessage
+	fmtMessage   = "[%s] %s > %s"
+	messageL     = 5
+	historyL     = 50
+	mu           sync.Mutex
 )
 
+type cacheMessage struct {
+	time.Time
+	nickname string
+	content  string
+}
+
+func (c cacheMessage) String() string {
+	dateStr := c.Time.Format("2006-01-02 15:04:05")
+	return fmt.Sprintf(fmtMessage, c.nickname, dateStr, c.content)
+}
+
 func init() {
-	cacheChatMessages = make(map[int64][]string)
+	chatMessages = make(map[int64][]cacheMessage)
 	engine.OnMessage(onDb).Handle(func(ctx *zero.Ctx) {
 		if zero.OnlyToMe(ctx) {
 			return
@@ -64,11 +76,15 @@ func init() {
 			}
 
 			mu.Lock()
-			date := time.Now().Format("2006-01-02 15:04:05")
-			cacheChatMessages[uid] = append(cacheChatMessages[uid], fmt.Sprintf(fmtMessage, ctx.Event.Sender.NickName, date, plainMessage))
-			// 10条
-			if l := len(cacheChatMessages); l > messageL {
-				cacheChatMessages[uid] = cacheChatMessages[uid][l-messageL:]
+			chatMessages[uid] = append(chatMessages[uid], cacheMessage{
+				Time:     time.Now(),
+				nickname: ctx.NickName(),
+				content:  plainMessage,
+			})
+
+			// 5条
+			if l := len(chatMessages); l > messageL {
+				chatMessages[uid] = chatMessages[uid][l-messageL:]
 			}
 
 			// 随机回复
@@ -80,11 +96,21 @@ func init() {
 					return
 				}
 
-				messages := cacheChatMessages[uid]
-				cacheChatMessages[uid] = nil
+				messages := chatMessages[uid]
+				chatMessages[uid] = nil
 				mu.Unlock()
 
-				completions(ctx, uid, k.Name, strings.Join(messages, "\n\n"), histories)
+				now := time.Now()
+				strMessages := make([]string, 0)
+				for _, msg := range messages {
+					if msg.Time.After(now.Add(-10 * time.Minute)) {
+						strMessages = append(strMessages, msg.String())
+					}
+				}
+
+				if len(strMessages) > 0 {
+					completions(ctx, uid, k.Name, strings.Join(strMessages, "\n\n"), histories)
+				}
 			} else {
 				mu.Unlock()
 			}
@@ -111,6 +137,7 @@ func init() {
 		}
 
 		if plainMessage == "reset" || plainMessage == "重置记忆" {
+			chatMessages[uid] = nil
 			err := Db.cleanHistories(uid, c.Key)
 			if err != nil {
 				ctx.Send(message.Text("ERROR: ", err))
@@ -120,7 +147,7 @@ func init() {
 			return
 		}
 
-		histories, err := Db.findHistory(uid, c.Key, 100)
+		histories, err := Db.findHistory(uid, c.Key, historyL)
 		if err != nil && !IsSqlNull(err) {
 			ctx.Send(message.Text("ERROR: ", err))
 			return
@@ -128,12 +155,17 @@ func init() {
 
 		mu.Lock()
 		if c.Imitate {
-			date := time.Now().Format("2006-01-02 15:04:05")
-			plainMessage = fmt.Sprintf(fmtMessage, name, date, plainMessage)
-			cacheChatMessages[uid] = append(cacheChatMessages[uid], plainMessage)
-			plainMessage = strings.Join(cacheChatMessages[uid], "\n\n")
+			strMessages := make([]string, 0)
+			now := time.Now()
+			for _, msg := range chatMessages[uid] {
+				if msg.After(now.Add(-10 * time.Minute)) {
+					strMessages = append(strMessages, msg.String())
+				}
+			}
+			strMessages = append(strMessages, cacheMessage{now, ctx.NickName(), plainMessage}.String())
+			plainMessage = strings.Join(strMessages, "\n\n")
 		}
-		cacheChatMessages[uid] = nil
+		chatMessages[uid] = nil
 		mu.Unlock()
 
 		completions(ctx, uid, c.Key, plainMessage, histories)
@@ -384,7 +416,13 @@ func ExtPlainMessage(ctx *zero.Ctx) string {
 			sb.WriteString(fmt.Sprintf(" @%s ", nickName))
 		}
 	}
-	return sb.String()
+
+	result := sb.String()
+	//
+	if matched, _ := regexp.MatchString(`\d+ \d+ \d+`, result); matched {
+		return ""
+	}
+	return result
 }
 
 func IsSqlNull(err error) bool {
