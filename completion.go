@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	zero "github.com/wdvxdr1123/ZeroBot"
 	"github.com/wdvxdr1123/ZeroBot/message"
 	"golang.org/x/net/proxy"
@@ -159,6 +160,7 @@ func generation(ctx *zero.Ctx, text string) {
 
 // 对话
 func completions(ctx *zero.Ctx, uid int64, name, content string, histories []*history) {
+	logrus.Infof("开始对话 [%d] ...", uid)
 	messages := make([]map[string]string, 0)
 	for hL := len(histories) - 1; hL >= 0; hL-- {
 		h := histories[hL]
@@ -250,7 +252,7 @@ func completions(ctx *zero.Ctx, uid int64, name, content string, histories []*hi
 			ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(result))
 		}
 	} else {
-		result, err = batchResponse(ctx, ch, []string{"!", ".", "?", "！", "。", "？", "\n\n"}, []string{".", "。", "\n\n"})
+		result, err = batchResponse(ctx, ch, []string{"!", ".", "！", "。", "\n\n"}, []string{".", "。", "\n\n"})
 		if err != nil {
 			ctx.Send(message.Text("ERROR: ", err))
 			return
@@ -267,16 +269,22 @@ func completions(ctx *zero.Ctx, uid int64, name, content string, histories []*hi
 	if err != nil {
 		ctx.Send(message.Text("ERROR: ", err))
 	}
+	logrus.Infof("结束对话 [%d] .", uid)
 }
 
 func batchResponse(ctx *zero.Ctx, ch chan string, symbols []string, igSymbols []string) (result string, err error) {
 	buf := ""
 
 	for {
+		toAt := ctx.Event.IsToMe
+		if toAt { // 减少At别人
+			toAt = !zero.OnlyPrivate(ctx) && rand.Intn(2) < 1
+		}
+
 		text, ok := <-ch
 		if !ok {
 			if tex := strings.TrimSpace(buf); tex != "" {
-				if ctx.Event.IsToMe {
+				if toAt {
 					ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(tex))
 				} else {
 					ctx.SendChain(message.Text(tex))
@@ -291,13 +299,7 @@ func batchResponse(ctx *zero.Ctx, ch chan string, symbols []string, igSymbols []
 
 		text = strings.TrimPrefix(text, "text: ")
 		result += text
-
 		buf += text
-
-		toAt := ctx.Event.IsToMe
-		if toAt { // 减少At别人
-			toAt = rand.Intn(2) < 1
-		}
 
 		for _, symbol := range symbols {
 			index := strings.Index(buf, symbol)
@@ -308,7 +310,7 @@ func batchResponse(ctx *zero.Ctx, ch chan string, symbols []string, igSymbols []
 				}
 
 				tex := strings.TrimSpace(buf[:index+l])
-				if tex != "" && !zero.OnlyPrivate(ctx) && toAt {
+				if tex != "" && toAt {
 					ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(tex))
 				} else {
 					ctx.SendChain(message.Text(tex))

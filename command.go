@@ -35,7 +35,8 @@ var (
 
 	cacheChatMessages map[int64][]string
 	fmtMessage        = "[%s] %s > %s"
-	messageL          = 20
+	messageL          = 10
+	historyL          = 50
 	mu                sync.Mutex
 )
 
@@ -65,14 +66,14 @@ func init() {
 			mu.Lock()
 			date := time.Now().Format("2006-01-02 15:04:05")
 			cacheChatMessages[uid] = append(cacheChatMessages[uid], fmt.Sprintf(fmtMessage, ctx.Event.Sender.NickName, date, plainText))
-			// 100条
+			// 10条
 			if l := len(cacheChatMessages); l > messageL {
 				cacheChatMessages[uid] = cacheChatMessages[uid][l-messageL:]
 			}
 
 			// 随机回复
 			if rand.Intn(100) < c.Freq {
-				histories, e := Db.findHistory(uid, k.Name, 50)
+				histories, e := Db.findHistory(uid, k.Name, historyL)
 				if e != nil && !IsSqlNull(e) {
 					logrus.Error(e)
 					mu.Unlock()
