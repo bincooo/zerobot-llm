@@ -56,8 +56,8 @@ func init() {
 			return
 		}
 
-		plainText := strings.TrimSpace(ctx.ExtractPlainText())
-		if plainText != "" {
+		plainMessage := ExtPlainMessage(ctx)
+		if plainMessage != "" {
 			uid := ctx.Event.UserID
 			if ctx.Event.GroupID > 0 {
 				uid = ctx.Event.GroupID
@@ -65,7 +65,7 @@ func init() {
 
 			mu.Lock()
 			date := time.Now().Format("2006-01-02 15:04:05")
-			cacheChatMessages[uid] = append(cacheChatMessages[uid], fmt.Sprintf(fmtMessage, ctx.Event.Sender.NickName, date, plainText))
+			cacheChatMessages[uid] = append(cacheChatMessages[uid], fmt.Sprintf(fmtMessage, ctx.Event.Sender.NickName, date, plainMessage))
 			// 10条
 			if l := len(cacheChatMessages); l > messageL {
 				cacheChatMessages[uid] = cacheChatMessages[uid][l-messageL:]
@@ -103,14 +103,14 @@ func init() {
 		}
 
 		c := Db.config()
-		plainText := strings.TrimSpace(ctx.ExtractPlainText())
-		if len(plainText) == 0 {
+		plainMessage := ExtPlainMessage(ctx)
+		if len(plainMessage) == 0 {
 			emojis := []string{"😀", "😂", "🙃", "🥲", "🤔", "🤨"}
 			ctx.Send(message.Text(emojis[rand.Intn(len(emojis)-1)]))
 			return
 		}
 
-		if plainText == "reset" || plainText == "重置记忆" {
+		if plainMessage == "reset" || plainMessage == "重置记忆" {
 			err := Db.cleanHistories(uid, c.Key)
 			if err != nil {
 				ctx.Send(message.Text("ERROR: ", err))
@@ -129,14 +129,14 @@ func init() {
 		mu.Lock()
 		if c.Imitate {
 			date := time.Now().Format("2006-01-02 15:04:05")
-			plainText = fmt.Sprintf(fmtMessage, name, date, plainText)
-			cacheChatMessages[uid] = append(cacheChatMessages[uid], plainText)
-			plainText = strings.Join(cacheChatMessages[uid], "\n\n")
+			plainMessage = fmt.Sprintf(fmtMessage, name, date, plainMessage)
+			cacheChatMessages[uid] = append(cacheChatMessages[uid], plainMessage)
+			plainMessage = strings.Join(cacheChatMessages[uid], "\n\n")
 		}
 		cacheChatMessages[uid] = nil
 		mu.Unlock()
 
-		completions(ctx, uid, c.Key, plainText, histories)
+		completions(ctx, uid, c.Key, plainMessage, histories)
 	})
 
 	engine.OnPrefix("画", zero.OnlyToMe, onDb).SetBlock(true).Handle(func(ctx *zero.Ctx) {
@@ -364,6 +364,27 @@ func init() {
 			}
 			ctx.Send(message.Text("已更新绘画 key。"))
 		})
+}
+
+// 消息体转换成纯文本内容
+func ExtPlainMessage(ctx *zero.Ctx) string {
+	sb := new(strings.Builder)
+	m := ctx.Event.Message
+	for _, val := range m {
+		if val.Type == "text" {
+			sb.WriteString(val.Data["text"])
+		} else if val.Type == "at" {
+			qq := val.Data["qq"]
+			i32, err := strconv.ParseInt(qq, 10, 32)
+			if err != nil {
+				logrus.Warn("解析uid失败：", err)
+				continue
+			}
+			nickName := ctx.CardOrNickName(i32)
+			sb.WriteString(fmt.Sprintf(" @%s ", nickName))
+		}
+	}
+	return sb.String()
 }
 
 func IsSqlNull(err error) bool {
