@@ -418,7 +418,9 @@ func ExtPlainMessage(ctx *zero.Ctx) string {
 	}
 
 	result := sb.String()
-	//
+	if result == "是" {
+		return ""
+	}
 	if matched, _ := regexp.MatchString(`\d+ \d+ \d+`, result); matched {
 		return ""
 	}
