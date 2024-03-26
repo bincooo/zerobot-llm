@@ -78,7 +78,7 @@ func init() {
 			mu.Lock()
 			chatMessages[uid] = append(chatMessages[uid], cacheMessage{
 				Time:     time.Now(),
-				nickname: ctx.NickName(),
+				nickname: ctx.CardOrNickName(ctx.Event.UserID),
 				content:  plainMessage,
 			})
 
@@ -123,7 +123,7 @@ func init() {
 			uid = ctx.Event.GroupID
 		}
 
-		name := ctx.Event.Sender.NickName
+		name := ctx.CardOrNickName(ctx.Event.UserID)
 		if strings.Contains(name, "Q群管家") {
 			return
 		}
@@ -162,7 +162,7 @@ func init() {
 					strMessages = append(strMessages, msg.String())
 				}
 			}
-			strMessages = append(strMessages, cacheMessage{now, ctx.NickName(), plainMessage}.String())
+			strMessages = append(strMessages, cacheMessage{now, ctx.CardOrNickName(ctx.Event.UserID), plainMessage}.String())
 			plainMessage = strings.Join(strMessages, "\n\n")
 		}
 		chatMessages[uid] = nil
@@ -184,7 +184,7 @@ func init() {
 			uid = ctx.Event.GroupID
 		}
 
-		name := ctx.Event.Sender.NickName
+		name := ctx.CardOrNickName(ctx.Event.UserID)
 		if strings.Contains(name, "Q群管家") {
 			return
 		}
@@ -412,8 +412,7 @@ func ExtPlainMessage(ctx *zero.Ctx) string {
 				logrus.Warn("解析uid失败：", err)
 				continue
 			}
-			nickName := ctx.CardOrNickName(i32)
-			sb.WriteString(fmt.Sprintf(" @%s ", nickName))
+			sb.WriteString(fmt.Sprintf(" @%s ", ctx.CardOrNickName(i32)))
 		}
 	}
 
