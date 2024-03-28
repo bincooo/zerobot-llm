@@ -35,8 +35,8 @@ var (
 	})
 
 	chatMessages map[int64][]cacheMessage
-	fmtMessage   = "[%s] %s > %s"
-	messageL     = 5
+	fmtMessage   = "%s: %s"
+	messageL     = 10
 	historyL     = 50
 	mu           sync.Mutex
 )
@@ -48,8 +48,7 @@ type cacheMessage struct {
 }
 
 func (c cacheMessage) String() string {
-	dateStr := c.Time.Format("2006-01-02 15:04:05")
-	return fmt.Sprintf(fmtMessage, c.nickname, dateStr, c.content)
+	return fmt.Sprintf(fmtMessage, c.nickname, c.content)
 }
 
 func init() {
@@ -82,7 +81,7 @@ func init() {
 				content:  plainMessage,
 			})
 
-			// 5条
+			// 控制条数
 			if l := len(chatMessages); l > messageL {
 				chatMessages[uid] = chatMessages[uid][l-messageL:]
 			}
