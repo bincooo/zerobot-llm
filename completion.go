@@ -312,7 +312,8 @@ func batchResponse(ctx *zero.Ctx, ch chan string, symbols []string, igSymbols []
 				}
 
 				tex := strings.TrimSpace(buf[:index+l])
-				if tex != "" && toAt {
+				if tex == ".." || tex == "。。" {
+				} else if tex != "" && toAt {
 					ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(tex))
 				} else {
 					ctx.SendChain(message.Text(tex))
