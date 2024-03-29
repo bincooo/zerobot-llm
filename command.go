@@ -136,6 +136,8 @@ func init() {
 		}
 
 		if plainMessage == "reset" || plainMessage == "重置记忆" {
+			mu.Lock()
+			defer mu.Unlock()
 			chatMessages[uid] = nil
 			err := Db.cleanHistories(uid, c.Key)
 			if err != nil {

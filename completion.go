@@ -17,13 +17,12 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 )
 
 type chatRequest struct {
-	ChatId        string              `json:"chatId"`
+	ChatId        *string             `json:"chatId"`
 	Messages      []map[string]string `json:"messages"`
 	Model         string              `json:"model"`
 	MaxTokens     int                 `json:"max_tokens"`
@@ -194,7 +193,7 @@ func completions(ctx *zero.Ctx, uid int64, name, content string, histories []*hi
 	}
 
 	payload := chatRequest{
-		ChatId:      strconv.FormatInt(uid, 10),
+		// ChatId:      strconv.FormatInt(uid, 10),
 		Model:       c.Model,
 		Messages:    messages,
 		MaxTokens:   2048,
