@@ -254,7 +254,7 @@ func completions(ctx *zero.Ctx, uid int64, name, content string, histories []*hi
 			ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(result))
 		}
 	} else {
-		result, err = batchResponse(ctx, ch, []string{"!", ".", "！", "。", "\n\n"}, []string{".", "。", "\n\n"})
+		result, err = batchResponse(ctx, ch, []string{"!", "...", ".", "！", "。。。", "。", "\n\n"}, []string{".", "。", "\n\n"})
 		if err != nil {
 			ctx.Send(message.Text("ERROR: ", err))
 			return
@@ -312,8 +312,7 @@ func batchResponse(ctx *zero.Ctx, ch chan string, symbols []string, igSymbols []
 				}
 
 				tex := strings.TrimSpace(buf[:index+l])
-				if tex == ".." || tex == "。。" {
-				} else if tex != "" && toAt {
+				if tex != "" && toAt {
 					ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(tex))
 				} else {
 					ctx.SendChain(message.Text(tex))
