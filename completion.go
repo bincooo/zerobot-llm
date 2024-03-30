@@ -307,10 +307,10 @@ func batchResponse(ctx *zero.Ctx, ch chan string, symbols []string, igSymbols []
 		if len(buf) < 4 {
 			continue
 		}
-		if nsp || strings.HasPrefix(buf, "!F!:") {
+		if nsp || strings.HasPrefix(buf, "\n!F!:") {
 			// 不做分割
 			if !nsp {
-				buf = buf[4:]
+				buf = buf[5:]
 				nsp = true
 			}
 			continue

@@ -67,6 +67,10 @@ func init() {
 			return
 		}
 
+		name := ctx.CardOrNickName(ctx.Event.UserID)
+		if strings.Contains(name, "Q群管家") {
+			return
+		}
 		plainMessage := ExtPlainMessage(ctx)
 		if plainMessage != "" {
 			uid := ctx.Event.UserID
@@ -77,7 +81,7 @@ func init() {
 			mu.Lock()
 			chatMessages[uid] = append(chatMessages[uid], cacheMessage{
 				Time:     time.Now(),
-				nickname: ctx.CardOrNickName(ctx.Event.UserID),
+				nickname: name,
 				content:  plainMessage,
 			})
 
