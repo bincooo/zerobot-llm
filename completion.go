@@ -303,6 +303,11 @@ func batchResponse(ctx *zero.Ctx, ch chan string, symbols []string, igSymbols []
 		result += text
 		buf += text
 
+		if strings.HasPrefix(buf, "!F!:") {
+			// 不做分割
+			continue
+		}
+
 		for _, symbol := range symbols {
 			index := strings.Index(buf, symbol)
 			if index > 0 {
