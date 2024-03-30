@@ -276,6 +276,7 @@ func completions(ctx *zero.Ctx, uid int64, name, content string, histories []*hi
 
 func batchResponse(ctx *zero.Ctx, ch chan string, symbols []string, igSymbols []string) (result string, err error) {
 	buf := ""
+	nsp := false
 
 	for {
 		toAt := ctx.Event.IsToMe
@@ -303,8 +304,12 @@ func batchResponse(ctx *zero.Ctx, ch chan string, symbols []string, igSymbols []
 		result += text
 		buf += text
 
-		if strings.HasPrefix(buf, "!F!:") {
+		if nsp || strings.HasPrefix(buf, "!F!:") {
 			// 不做分割
+			if !nsp {
+				buf = buf[4:]
+				nsp = true
+			}
 			continue
 		}
 
