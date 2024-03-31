@@ -22,15 +22,16 @@ import (
 )
 
 type chatRequest struct {
-	ChatId        *string             `json:"chatId"`
-	Messages      []map[string]string `json:"messages"`
-	Model         string              `json:"model"`
-	MaxTokens     int                 `json:"max_tokens"`
-	StopSequences []string            `json:"stop_sequences"`
-	Temperature   float32             `json:"temperature"`
-	TopK          int                 `json:"topK"`
-	TopP          float32             `json:"topP"`
-	Stream        bool                `json:"stream"`
+	ChatId        *string                `json:"chatId"`
+	Vars          map[string]interface{} `json:"variables"`
+	Messages      []map[string]string    `json:"messages"`
+	Model         string                 `json:"model"`
+	MaxTokens     int                    `json:"max_tokens"`
+	StopSequences []string               `json:"stop_sequences"`
+	Temperature   float32                `json:"temperature"`
+	TopK          int                    `json:"topK"`
+	TopP          float32                `json:"topP"`
+	Stream        bool                   `json:"stream"`
 }
 
 type chatResponse struct {
@@ -194,6 +195,11 @@ func completions(ctx *zero.Ctx, uid int64, name, content string, histories []*hi
 
 	payload := chatRequest{
 		// ChatId:      strconv.FormatInt(uid, 10),
+		Vars: map[string]interface{}{
+			"userId":   fmt.Sprintf("%d", ctx.Event.Sender.ID),
+			"groupId":  fmt.Sprintf("%d", ctx.Event.GroupID),
+			"nickname": ctx.CardOrNickName(ctx.Event.UserID),
+		},
 		Model:       c.Model,
 		Messages:    messages,
 		MaxTokens:   2048,
