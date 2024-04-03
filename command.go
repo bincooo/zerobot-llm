@@ -412,7 +412,7 @@ func ExtPlainMessage(ctx *zero.Ctx) string {
 			sb.WriteString(val.Data["text"])
 		} else if val.Type == "at" {
 			qq := val.Data["qq"]
-			i32, err := strconv.ParseInt(qq, 10, 32)
+			i32, err := strconv.ParseInt(qq, 10, 64)
 			if err != nil {
 				logrus.Warn("解析uid失败：", err)
 				continue
