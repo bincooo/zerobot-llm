@@ -35,7 +35,7 @@ var (
 	})
 
 	chatMessages map[int64][]cacheMessage
-	fmtMessage   = "%s: %s"
+	fmtMessage   = "NAME: \"%s\"\nMESSAGE: \n%s"
 	messageL     = 10
 	historyL     = 50
 	mu           sync.Mutex
