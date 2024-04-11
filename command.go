@@ -35,7 +35,7 @@ var (
 	})
 
 	chatMessages map[int64][]cacheMessage
-	fmtMessage   = "NAME: \"%s\"\nMESSAGE: \n%s"
+	fmtMessage   = "TIME: %s\nNAME: \"%s\"\nMESSAGE: \n%s"
 	messageL     = 10
 	historyL     = 50
 	mu           sync.Mutex
@@ -48,7 +48,7 @@ type cacheMessage struct {
 }
 
 func (c cacheMessage) String() string {
-	return fmt.Sprintf(fmtMessage, c.nickname, c.content)
+	return fmt.Sprintf(fmtMessage, c.Format("2006-01-02 15:04:05"), c.nickname, c.content)
 }
 
 func init() {
@@ -219,6 +219,16 @@ func init() {
 
 		completions(ctx, uid, matched[1], msg, histories)
 	})
+
+	engine.OnRegex(`^/clear\s+(\S+)`, zero.AdminPermission, onDb).SetBlock(true).
+		Handle(func(ctx *zero.Ctx) {
+			matched := ctx.State["regex_matched"].([]string)
+			if err := Db.cleanAllHistories(matched[1]); err != nil {
+				ctx.Send(message.Text("ERROR: ", err))
+				return
+			}
+			ctx.Send("已清理 ~")
+		})
 
 	engine.OnRegex(`^/set-key\s+(\S+)\s+(\S+)$`, zero.AdminPermission, onDb).SetBlock(true).
 		Handle(func(ctx *zero.Ctx) {

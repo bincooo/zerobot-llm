@@ -134,6 +134,12 @@ func (d *db) cleanHistories(uid int64, name string) error {
 	return d.sql.Del("history", "where uid = "+strconv.FormatInt(uid, 10)+" and name = '"+name+"'")
 }
 
+func (d *db) cleanAllHistories(name string) error {
+	d.Lock()
+	defer d.Unlock()
+	return d.sql.Del("history", "where name = '"+name+"'")
+}
+
 func (d *db) key(name string) (*key, error) {
 	d.Lock()
 	defer d.Unlock()
