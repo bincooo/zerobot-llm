@@ -267,7 +267,7 @@ func completions(ctx *zero.Ctx, uid int64, name, content string, histories []*hi
 		}
 	}
 
-	if result == "Oops" {
+	if strings.TrimSpace(result) == "Oops" {
 		logrus.Warn("completions Oops.")
 		return
 	}
