@@ -267,6 +267,11 @@ func completions(ctx *zero.Ctx, uid int64, name, content string, histories []*hi
 		}
 	}
 
+	if result == "Oops" {
+		logrus.Warn("completions Oops.")
+		return
+	}
+
 	err = Db.saveHistory(history{
 		Timestamp:        time.Now().Unix(),
 		Uid:              uid,
