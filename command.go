@@ -6,6 +6,7 @@ import (
 	"github.com/FloatTech/zbputils/control"
 	"github.com/sirupsen/logrus"
 	zero "github.com/wdvxdr1123/ZeroBot"
+	"github.com/wdvxdr1123/ZeroBot/extension/rate"
 	"github.com/wdvxdr1123/ZeroBot/message"
 	"math/rand"
 	"regexp"
@@ -39,6 +40,9 @@ var (
 	messageL     = 10
 	historyL     = 50
 	mu           sync.Mutex
+
+	// 每个聊天室限流3s一次
+	limitManager = rate.NewManager[int64](3*time.Second, 1)
 )
 
 type cacheMessage struct {
@@ -88,6 +92,14 @@ func init() {
 			// 控制条数
 			if l := len(chatMessages); l > messageL {
 				chatMessages[uid] = chatMessages[uid][l-messageL:]
+			}
+
+			// 限流
+			limiter := limitManager.Load(uid)
+			if !limiter.Acquire() {
+				mu.Unlock()
+				logrus.Warnf("当前请求限流: %d", uid)
+				return
 			}
 
 			// 随机回复
