@@ -312,7 +312,7 @@ func waitResponse(ch chan string) (result string, err error) {
 	for {
 		text, ok := <-ch
 		if !ok {
-			return
+			break
 		}
 
 		if strings.HasPrefix(text, "error: ") {
@@ -322,6 +322,9 @@ func waitResponse(ch chan string) (result string, err error) {
 		text = strings.TrimPrefix(text, "text: ")
 		result += text
 	}
+
+	result = cleanEmoji(result)
+	return
 }
 
 func resolve(response *http.Response, ch chan string) {
