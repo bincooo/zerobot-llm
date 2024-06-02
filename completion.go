@@ -201,7 +201,7 @@ func completions(ctx *zero.Ctx, uid int64, name, content string, histories []*hi
 		JHeader().
 		Header("Authorization", "Bearer "+k.Content).
 		Body(payload).
-		DoC(emit.Status(http.StatusOK), emit.IsJSON)
+		DoC(emit.Status(http.StatusOK), emit.IsSTREAM)
 	if err != nil {
 		ctx.Send(message.Text("ERROR: ", err))
 		return
