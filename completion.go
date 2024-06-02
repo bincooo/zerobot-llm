@@ -4,21 +4,20 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/bincooo/emit.io"
 	"github.com/sirupsen/logrus"
 	zero "github.com/wdvxdr1123/ZeroBot"
 	"github.com/wdvxdr1123/ZeroBot/message"
-	"golang.org/x/net/proxy"
 	"io"
 	"math/rand"
-	"net"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
+
+	"github.com/bincooo/go.emoji"
 )
 
 type chatRequest struct {
@@ -92,38 +91,25 @@ func generation(ctx *zero.Ctx, text string) {
 		N:       1,
 	}
 
-	client, err := newClient(c.Proxies)
+	timeout, cancel := context.WithTimeout(context.Background(), 180*time.Second)
+	defer cancel()
+
+	response, err := emit.ClientBuilder().
+		Context(timeout).
+		Proxies(c.Proxies).
+		POST(c.PaintUrl+"/v1/images/generations").
+		JHeader().
+		Header("Authorization", "Bearer "+k).
+		Body(payload).
+		DoC(emit.Status(http.StatusOK), emit.IsJSON)
 	if err != nil {
 		ctx.Send(message.Text("ERROR: ", err))
 		return
 	}
 
-	marshal, _ := json.Marshal(payload)
-	request, err := http.NewRequest(http.MethodPost, c.PaintUrl+"/v1/images/generations", bytes.NewReader(marshal))
+	result, err := emit.ToMap(response)
 	if err != nil {
 		ctx.Send(message.Text("ERROR: ", err))
-		return
-	}
-
-	h := request.Header
-	h.Set("authorization", "Bearer "+k)
-	h.Set("content-type", "application/json")
-
-	response, err := client.Do(request)
-	if err != nil {
-		ctx.Send(message.Text("ERROR: ", err))
-		return
-	}
-
-	if response.StatusCode != http.StatusOK {
-		ctx.Send(message.Text("ERROR: ", response.Status))
-		return
-	}
-
-	var result map[string]interface{}
-	data, err := io.ReadAll(response.Body)
-	if err = json.Unmarshal(data, &result); err != nil {
-		ctx.Send(message.Text("ERROR: ", response.Status))
 		return
 	}
 
@@ -140,18 +126,16 @@ func generation(ctx *zero.Ctx, text string) {
 	}
 
 	d := list[0].(map[string]interface{})
-	response, err = client.Get(d["url"].(string))
+	response, err = emit.ClientBuilder().
+		Proxies(c.Proxies).
+		GET(d["url"].(string)).
+		DoS(http.StatusOK)
 	if err != nil {
 		ctx.Send(message.Text("ERROR: 下载图片失败 > ", err))
 		return
 	}
 
-	if response.StatusCode != http.StatusOK {
-		ctx.Send(message.Text("ERROR: ", response.Status))
-		return
-	}
-
-	data, err = io.ReadAll(response.Body)
+	data, err := io.ReadAll(response.Body)
 	if err != nil {
 		ctx.Send(message.Text("ERROR: 下载图片失败 > ", err))
 		return
@@ -182,12 +166,6 @@ func completions(ctx *zero.Ctx, uid int64, name, content string, histories []*hi
 	})
 
 	c := Db.config()
-	client, err := newClient(c.Proxies)
-	if err != nil {
-		ctx.Send(message.Text("ERROR: ", err))
-		return
-	}
-
 	im := false
 	if c.Key == name {
 		im = c.Imitate
@@ -207,31 +185,25 @@ func completions(ctx *zero.Ctx, uid int64, name, content string, histories []*hi
 		Stream:      true,
 	}
 
-	marshal, _ := json.Marshal(payload)
-	request, err := http.NewRequest(http.MethodPost, c.BaseUrl+"/v1/chat/completions", bytes.NewReader(marshal))
-	if err != nil {
-		ctx.Send(message.Text("ERROR: ", err))
-		return
-	}
-
 	k, err := Db.key(name)
 	if err != nil {
 		ctx.Send(message.Text("ERROR: key query -> ", err))
 		return
 	}
 
-	h := request.Header
-	h.Set("authorization", "Bearer "+k.Content)
-	h.Set("content-type", "application/json")
+	timeout, cancel := context.WithTimeout(context.Background(), 180*time.Second)
+	defer cancel()
 
-	response, err := client.Do(request)
+	response, err := emit.ClientBuilder().
+		Context(timeout).
+		Proxies(c.Proxies).
+		POST(c.BaseUrl+"/v1/chat/completions").
+		JHeader().
+		Header("Authorization", "Bearer "+k.Content).
+		Body(payload).
+		DoC(emit.Status(http.StatusOK), emit.IsJSON)
 	if err != nil {
 		ctx.Send(message.Text("ERROR: ", err))
-		return
-	}
-
-	if response.StatusCode != http.StatusOK {
-		ctx.Send(message.Text("ERROR: ", response.Status))
 		return
 	}
 
@@ -287,7 +259,6 @@ func completions(ctx *zero.Ctx, uid int64, name, content string, histories []*hi
 
 func batchResponse(ctx *zero.Ctx, ch chan string, symbols []string, igSymbols []string) (result string, err error) {
 	buf := ""
-	nsp := false
 
 	for {
 		toAt := ctx.Event.IsToMe
@@ -312,20 +283,10 @@ func batchResponse(ctx *zero.Ctx, ch chan string, symbols []string, igSymbols []
 		}
 
 		text = strings.TrimPrefix(text, "text: ")
-		result += text
 		buf += text
-
-		if len(buf) < 4 {
-			continue
-		}
-		if nsp || strings.HasPrefix(buf, "\n!F!:") {
-			// 不做分割
-			if !nsp {
-				buf = buf[5:]
-				nsp = true
-			}
-			continue
-		}
+		buf = cleanEmoji(buf)
+		result += text
+		result = cleanEmoji(result)
 
 		for _, symbol := range symbols {
 			index := strings.Index(buf, symbol)
@@ -430,45 +391,29 @@ func resolve(response *http.Response, ch chan string) {
 	}
 }
 
-func newClient(proxies string) (*http.Client, error) {
-	client := http.DefaultClient
-	if proxies != "" {
-		proxiesUrl, err := url.Parse(proxies)
-		if err != nil {
-			return nil, err
+// 只保留一个emoji
+func cleanEmoji(raw string) string {
+	var (
+		pos      int
+		previous string
+	)
+
+	return emoji.ReplaceEmoji(raw, func(index int, emoji string) string {
+		if index-len(emoji) != pos {
+			previous = emoji
+			pos = index
+			return emoji
 		}
 
-		if proxiesUrl.Scheme == "http" || proxiesUrl.Scheme == "https" {
-			client = &http.Client{
-				Transport: &http.Transport{
-					Proxy: http.ProxyURL(proxiesUrl),
-					TLSClientConfig: &tls.Config{
-						InsecureSkipVerify: true,
-					},
-				},
-			}
+		if emoji == previous {
+			pos = index
+			return ""
 		}
 
-		// socks5://127.0.0.1:7890
-		if proxiesUrl.Scheme == "socks5" {
-			client = &http.Client{
-				Transport: &http.Transport{
-					DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-						dialer, e := proxy.SOCKS5("tcp", proxiesUrl.Host, nil, proxy.Direct)
-						if e != nil {
-							return nil, e
-						}
-						return dialer.Dial(network, addr)
-					},
-					TLSClientConfig: &tls.Config{
-						InsecureSkipVerify: true,
-					},
-				},
-			}
-		}
-	}
-
-	return client, nil
+		previous = emoji
+		pos = index
+		return emoji
+	})
 }
 
 func Contains[T comparable](list []T, item T) bool {
