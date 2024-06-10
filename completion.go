@@ -259,6 +259,7 @@ func completions(ctx *zero.Ctx, uid int64, name, content string, histories []*hi
 
 func batchResponse(ctx *zero.Ctx, ch chan string, symbols []string, igSymbols []string) (result string, err error) {
 	buf := ""
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	for {
 		toAt := ctx.Event.IsToMe
@@ -284,9 +285,9 @@ func batchResponse(ctx *zero.Ctx, ch chan string, symbols []string, igSymbols []
 
 		text = strings.TrimPrefix(text, "text: ")
 		buf += text
-		buf = cleanEmoji(buf)
+		buf = cleanEmoji(buf, r.Intn(3) > 0)
 		result += text
-		result = cleanEmoji(result)
+		result = cleanEmoji(result, r.Intn(3) > 0)
 
 		for _, symbol := range symbols {
 			index := strings.Index(buf, symbol)
@@ -323,7 +324,8 @@ func waitResponse(ch chan string) (result string, err error) {
 		result += text
 	}
 
-	result = cleanEmoji(result)
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	result = cleanEmoji(result, r.Intn(3) > 0)
 	return
 }
 
@@ -394,8 +396,8 @@ func resolve(response *http.Response, ch chan string) {
 	}
 }
 
-// 只保留一个emoji
-func cleanEmoji(raw string) string {
+// 只保留一个emoji, flag 为true时不保留
+func cleanEmoji(raw string, flag bool) string {
 	var (
 		pos      int
 		previous string
@@ -405,6 +407,9 @@ func cleanEmoji(raw string) string {
 		if index-len(emoji) != pos {
 			previous = emoji
 			pos = index
+			if flag {
+				return ""
+			}
 			return emoji
 		}
 
@@ -415,6 +420,9 @@ func cleanEmoji(raw string) string {
 
 		previous = emoji
 		pos = index
+		if flag {
+			return ""
+		}
 		return emoji
 	})
 }
