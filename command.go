@@ -95,6 +95,11 @@ func init() {
 			}
 
 			// 限流
+			if time.Now().Before(limit) {
+				logrus.Warnf("当前请求限流: %d", uid)
+				ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text("已限流，请稍后再试..."))
+				return
+			}
 			limiter := limitManager.Load(uid)
 			if !limiter.Acquire() {
 				mu.Unlock()
@@ -164,6 +169,19 @@ func init() {
 			return
 		}
 
+		// 限流
+		if time.Now().Before(limit) {
+			logrus.Warnf("当前请求限流: %d", uid)
+			ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text("已限流，请稍后再试..."))
+			return
+		}
+		limiter := limitManager.Load(uid)
+		if !limiter.Acquire() {
+			mu.Unlock()
+			logrus.Warnf("当前请求限流: %d", uid)
+			return
+		}
+
 		histories, err := Db.findHistory(uid, c.Key, historyL)
 		if err != nil && !IsSqlNull(err) {
 			ctx.Send(message.Text("ERROR: ", err))
@@ -220,6 +238,19 @@ func init() {
 				return
 			}
 			ctx.Send(message.Text("已清除上下文！"))
+			return
+		}
+
+		// 限流
+		if time.Now().Before(limit) {
+			logrus.Warnf("当前请求限流: %d", uid)
+			ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text("已限流，请稍后再试..."))
+			return
+		}
+		limiter := limitManager.Load(uid)
+		if !limiter.Acquire() {
+			mu.Unlock()
+			logrus.Warnf("当前请求限流: %d", uid)
 			return
 		}
 

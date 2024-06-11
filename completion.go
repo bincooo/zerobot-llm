@@ -68,6 +68,8 @@ type ChatGenRequest struct {
 var (
 	paintModels = []string{"dall-e-3", "pg.dall-e-3"}
 	FEPrefix    = []byte(`{"message":`)
+
+	limit = time.Now().Add(-100 * time.Second)
 )
 
 // 画图
@@ -203,6 +205,10 @@ func completions(ctx *zero.Ctx, uid int64, name, content string, histories []*hi
 		Body(payload).
 		DoC(emit.Status(http.StatusOK), emit.IsSTREAM)
 	if err != nil {
+		errStr := err.Error()
+		if strings.Contains(errStr, "429 Too Many Requests") || strings.Contains(errStr, "400 Bad Request") {
+			limit.Add(60 * time.Second)
+		}
 		ctx.Send(message.Text("ERROR: ", err))
 		return
 	}
