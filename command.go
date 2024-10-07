@@ -55,7 +55,7 @@ func (c cacheMessage) String() string {
 	return fmt.Sprintf(fmtMessage, c.Format("2006-01-02 15:04:05"), c.nickname, c.content)
 }
 
-func init() {
+func Init() {
 	chatMessages = make(map[int64][]cacheMessage)
 	engine.OnMessage(onDb).Handle(func(ctx *zero.Ctx) {
 		if zero.OnlyToMe(ctx) {
