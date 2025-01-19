@@ -125,7 +125,8 @@ func completions(ctx *zero.Ctx, uid int64, name, content string, histories []*Hi
 		if strings.Contains(errStr, "429 Too Many Requests") || strings.Contains(errStr, "400 Bad Request") {
 			limit.Add(60 * time.Second)
 		}
-		ctx.Send(message.Text("ERROR: ", err))
+		// ctx.Send(message.Text("ERROR: ", err))
+		logrus.Error(err)
 		return
 	}
 

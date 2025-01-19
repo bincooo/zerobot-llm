@@ -30,8 +30,8 @@ var (
 			"/config.imitate 默认开启自由发言 (true|false)\n" +
 			"/config.freq    自由发言频率 (0~100)\n" +
 			"/keys          查看所有key\n" +
-			"/set-Key       添加｜修改key (私聊)\n" +
-			"/del-Key       删除key\n" +
+			"/set-key       添加｜修改key (私聊)\n" +
+			"/del-key       删除key\n" +
 			"/chat [Key] ?? 指定key进行聊天\n" +
 			"@Bot ??        艾特机器人使用默认key聊天",
 		PrivateDataFolder: "llm",
@@ -272,7 +272,7 @@ func init() {
 			ctx.Send("已清理 ~")
 		})
 
-	engine.OnRegex(`^/set-Key\s+(\S+)\s+(\S+)$`, zero.AdminPermission, onDb).SetBlock(true).
+	engine.OnRegex(`^/set-key\s+(\S+)\s+(\S+)$`, zero.AdminPermission, onDb).SetBlock(true).
 		Handle(func(ctx *zero.Ctx) {
 			matched := ctx.State["regex_matched"].([]string)
 			if err := Db.saveKey(Key{Name: matched[1], Content: matched[2]}); err != nil {
@@ -282,7 +282,7 @@ func init() {
 			ctx.Send(message.Text("添加key成功。"))
 		})
 
-	engine.OnRegex(`^/del-Key\s+(\S+)$`, zero.AdminPermission, onDb).SetBlock(true).
+	engine.OnRegex(`^/del-key\s+(\S+)$`, zero.AdminPermission, onDb).SetBlock(true).
 		Handle(func(ctx *zero.Ctx) {
 			matched := ctx.State["regex_matched"].([]string)
 			if err := Db.delKey(matched[1]); err != nil {
