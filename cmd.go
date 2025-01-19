@@ -1,38 +1,40 @@
-package gpt
+package llm
 
 import (
 	"fmt"
-	ctrl "github.com/FloatTech/zbpctrl"
-	"github.com/FloatTech/zbputils/control"
-	"github.com/sirupsen/logrus"
-	zero "github.com/wdvxdr1123/ZeroBot"
-	"github.com/wdvxdr1123/ZeroBot/extension/rate"
-	"github.com/wdvxdr1123/ZeroBot/message"
 	"math/rand"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/FloatTech/zbputils/control"
+	"github.com/sirupsen/logrus"
+	"github.com/wdvxdr1123/ZeroBot/extension/rate"
+	"github.com/wdvxdr1123/ZeroBot/message"
+
+	ctrl "github.com/FloatTech/zbpctrl"
+	zero "github.com/wdvxdr1123/ZeroBot"
 )
 
 var (
-	engine = control.Register("gpt", &ctrl.Options[*zero.Ctx]{
+	engine = control.Register("llm", &ctrl.Options[*zero.Ctx]{
 		DisableOnDefault: false,
-		Brief:            "gpt",
+		Brief:            "llm",
 		Help: "/config         查看全局配置\n" +
-			"/config.key     默认gpt key (key name)\n" +
+			"/config.Key     默认llm Key (Key name)\n" +
 			"/config.model   默认模型类型\n" +
 			"/config.baseUrl 默认请求地址\n" +
 			"/config.proxies 默认代理\n" +
-			"/config.Im      默认开启自由发言 (true|false)\n" +
+			"/config.imitate 默认开启自由发言 (true|false)\n" +
 			"/config.freq    自由发言频率 (0~100)\n" +
 			"/keys          查看所有key\n" +
-			"/set-key       添加｜修改key (私聊)\n" +
-			"/del-key       删除key\n" +
-			"/chat [key] ?? 指定key进行聊天\n" +
+			"/set-Key       添加｜修改key (私聊)\n" +
+			"/del-Key       删除key\n" +
+			"/chat [Key] ?? 指定key进行聊天\n" +
 			"@Bot ??        艾特机器人使用默认key聊天",
-		PrivateDataFolder: "gpt",
+		PrivateDataFolder: "llm",
 	})
 
 	chatMessages map[int64][]cacheMessage
@@ -55,7 +57,7 @@ func (c cacheMessage) String() string {
 	return fmt.Sprintf(fmtMessage, c.Format("2006-01-02 15:04:05"), c.nickname, c.content)
 }
 
-func Init() {
+func init() {
 	chatMessages = make(map[int64][]cacheMessage)
 	engine.OnMessage(onDb).Handle(func(ctx *zero.Ctx) {
 		if zero.OnlyToMe(ctx) {
@@ -108,7 +110,8 @@ func Init() {
 			}
 
 			// 随机回复
-			if rand.Intn(100) < c.Freq {
+			r := rand.New(rand.NewSource(time.Now().UnixNano()))
+			if r.Intn(100) < c.Freq {
 				histories, e := Db.findHistory(uid, k.Name, historyL)
 				if e != nil && !IsSqlNull(e) {
 					logrus.Error(e)
@@ -156,7 +159,7 @@ func Init() {
 			return
 		}
 
-		if plainMessage == "reset" || plainMessage == "重置记忆" {
+		if plainMessage == "reset" || plainMessage == "消除记忆" {
 			mu.Lock()
 			defer mu.Unlock()
 			chatMessages[uid] = nil
@@ -206,12 +209,6 @@ func Init() {
 		completions(ctx, uid, c.Key, plainMessage, histories)
 	})
 
-	engine.OnPrefix("画", zero.OnlyToMe, onDb).SetBlock(true).Handle(func(ctx *zero.Ctx) {
-		plainText := strings.TrimSpace(ctx.ExtractPlainText())
-		plainText = strings.TrimPrefix(plainText, "画")
-		generation(ctx, plainText)
-	})
-
 	engine.OnRegex(`^/chat\s+(\S+)\s*(.*)$`, onDb).SetBlock(true).Handle(func(ctx *zero.Ctx) {
 		matched := ctx.State["regex_matched"].([]string)
 		uid := ctx.Event.UserID
@@ -231,7 +228,7 @@ func Init() {
 			return
 		}
 
-		if msg == "reset" || msg == "重置记忆" {
+		if msg == "reset" || msg == "消除记忆" {
 			err := Db.cleanHistories(uid, matched[1])
 			if err != nil {
 				ctx.Send(message.Text("ERROR: ", err))
@@ -273,17 +270,17 @@ func Init() {
 			ctx.Send("已清理 ~")
 		})
 
-	engine.OnRegex(`^/set-key\s+(\S+)\s+(\S+)$`, zero.AdminPermission, onDb).SetBlock(true).
+	engine.OnRegex(`^/set-Key\s+(\S+)\s+(\S+)$`, zero.AdminPermission, onDb).SetBlock(true).
 		Handle(func(ctx *zero.Ctx) {
 			matched := ctx.State["regex_matched"].([]string)
-			if err := Db.saveKey(key{Name: matched[1], Content: matched[2]}); err != nil {
+			if err := Db.saveKey(Key{Name: matched[1], Content: matched[2]}); err != nil {
 				ctx.Send(message.Text("ERROR: ", err))
 				return
 			}
 			ctx.Send(message.Text("添加key成功。"))
 		})
 
-	engine.OnRegex(`^/del-key\s+(\S+)$`, zero.AdminPermission, onDb).SetBlock(true).
+	engine.OnRegex(`^/del-Key\s+(\S+)$`, zero.AdminPermission, onDb).SetBlock(true).
 		Handle(func(ctx *zero.Ctx) {
 			matched := ctx.State["regex_matched"].([]string)
 			if err := Db.delKey(matched[1]); err != nil {
@@ -324,11 +321,9 @@ func Init() {
 			content += "proxies: " + c.Proxies + "\n"
 			content += "baseUrl: " + c.BaseUrl + "\n"
 			content += "model: " + c.Model + "\n"
-			content += "key: " + c.Key + "\n"
+			content += "Key: " + c.Key + "\n"
 			content += "imitate: " + strconv.FormatBool(c.Imitate) + "\n"
 			content += "freq: " + strconv.Itoa(c.Freq) + "%\n"
-			content += "paintUrl: " + c.PaintUrl + "\n"
-			content += "paintKey: " + c.PaintKey + "\n"
 			ctx.Send(message.Text(content))
 		})
 
@@ -371,7 +366,7 @@ func Init() {
 			ctx.Send(message.Text("已更新模型类型。"))
 		})
 
-	engine.OnRegex(`^/config\.key\s+(\S+)$`, zero.AdminPermission, onDb).SetBlock(true).
+	engine.OnRegex(`^/config\.Key\s+(\S+)$`, zero.AdminPermission, onDb).SetBlock(true).
 		Handle(func(ctx *zero.Ctx) {
 			matched := ctx.State["regex_matched"].([]string)
 			c := Db.config()
@@ -381,10 +376,10 @@ func Init() {
 				ctx.Send(message.Text("ERROR: ", err))
 				return
 			}
-			ctx.Send(message.Text("已更新gpt key。"))
+			ctx.Send(message.Text("已更新gpt Key。"))
 		})
 
-	engine.OnRegex(`^/config\.Im\s(true|false)$`, zero.AdminPermission, onDb).SetBlock(true).
+	engine.OnRegex(`^/config\.imitate\s(true|false)$`, zero.AdminPermission, onDb).SetBlock(true).
 		Handle(func(ctx *zero.Ctx) {
 			matched := ctx.State["regex_matched"].([]string)
 			c := Db.config()
@@ -427,32 +422,6 @@ func Init() {
 			}
 
 			ctx.Send(message.Text("已修改回复频率为 " + matched[1] + "%。"))
-		})
-
-	engine.OnRegex(`^/config\.paintUrl\s+(\S+)$`, zero.AdminPermission, onDb).SetBlock(true).
-		Handle(func(ctx *zero.Ctx) {
-			matched := ctx.State["regex_matched"].([]string)
-			c := Db.config()
-			c.PaintUrl = matched[1]
-			err := Db.updateConfig(c)
-			if err != nil {
-				ctx.Send(message.Text("ERROR: ", err))
-				return
-			}
-			ctx.Send(message.Text("已更新绘画接口。"))
-		})
-
-	engine.OnRegex(`^/config\.paintKey\s+(\S+)$`, zero.AdminPermission, onDb).SetBlock(true).
-		Handle(func(ctx *zero.Ctx) {
-			matched := ctx.State["regex_matched"].([]string)
-			c := Db.config()
-			c.PaintKey = matched[1]
-			err := Db.updateConfig(c)
-			if err != nil {
-				ctx.Send(message.Text("ERROR: ", err))
-				return
-			}
-			ctx.Send(message.Text("已更新绘画 key。"))
 		})
 }
 

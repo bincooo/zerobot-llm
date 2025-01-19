@@ -1,4 +1,4 @@
-package gpt
+package llm
 
 import (
 	"bufio"
@@ -66,88 +66,13 @@ type ChatGenRequest struct {
 }
 
 var (
-	paintModels = []string{"dall-e-3", "pg.dall-e-3"}
-	FEPrefix    = []byte(`{"message":`)
+	FEPrefix = []byte(`{"message":`)
 
 	limit = time.Now().Add(-100 * time.Second)
 )
 
-// 画图
-func generation(ctx *zero.Ctx, text string) {
-	c := Db.config()
-	k := c.PaintKey
-	if k == "" {
-		ctx.Send(message.Text("ERROR: 绘画key为空"))
-		return
-	}
-
-	m := paintModels[rand.Intn(2)]
-	q := "standard"
-	s := "vivid"
-
-	var payload = ChatGenRequest{
-		Model:   m,
-		Quality: q,
-		Style:   s,
-		Prompt:  text,
-		N:       1,
-	}
-
-	timeout, cancel := context.WithTimeout(context.Background(), 180*time.Second)
-	defer cancel()
-
-	response, err := emit.ClientBuilder().
-		Context(timeout).
-		Proxies(c.Proxies).
-		POST(c.PaintUrl+"/v1/images/generations").
-		JHeader().
-		Header("Authorization", "Bearer "+k).
-		Body(payload).
-		DoC(emit.Status(http.StatusOK), emit.IsJSON)
-	if err != nil {
-		ctx.Send(message.Text("ERROR: ", err))
-		return
-	}
-
-	result, err := emit.ToMap(response)
-	if err != nil {
-		ctx.Send(message.Text("ERROR: ", err))
-		return
-	}
-
-	if errMessage, ok := result["error"]; ok {
-		msg := errMessage.(map[string]interface{})["message"]
-		ctx.Send(message.Text(fmt.Sprintf("ERROR: %s", msg)))
-		return
-	}
-
-	list := result["data"].([]interface{})
-	if len(list) == 0 {
-		ctx.Send(message.Text("ERROR: 请求失败"))
-		return
-	}
-
-	d := list[0].(map[string]interface{})
-	response, err = emit.ClientBuilder().
-		Proxies(c.Proxies).
-		GET(d["url"].(string)).
-		DoS(http.StatusOK)
-	if err != nil {
-		ctx.Send(message.Text("ERROR: 下载图片失败 > ", err))
-		return
-	}
-
-	data, err := io.ReadAll(response.Body)
-	if err != nil {
-		ctx.Send(message.Text("ERROR: 下载图片失败 > ", err))
-		return
-	}
-
-	ctx.SendChain(message.Reply(ctx.Event.MessageID), message.ImageBytes(data))
-}
-
 // 对话
-func completions(ctx *zero.Ctx, uid int64, name, content string, histories []*history) {
+func completions(ctx *zero.Ctx, uid int64, name, content string, histories []*History) {
 	logrus.Infof("开始对话 [%d] ...", uid)
 	messages := make([]map[string]string, 0)
 	for hL := len(histories) - 1; hL >= 0; hL-- {
@@ -189,7 +114,7 @@ func completions(ctx *zero.Ctx, uid int64, name, content string, histories []*hi
 
 	k, err := Db.key(name)
 	if err != nil {
-		ctx.Send(message.Text("ERROR: key query -> ", err))
+		ctx.Send(message.Text("ERROR: Key query -> ", err))
 		return
 	}
 
@@ -237,6 +162,7 @@ func completions(ctx *zero.Ctx, uid int64, name, content string, histories []*hi
 		} else {
 			ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text(result))
 		}
+		return
 	} else {
 		result, err = batchResponse(ctx, ch, []string{"!", "...", ".", "！", "。。。", "。", "\n\n"}, []string{".", "。", "\n\n"})
 		if err != nil {
@@ -250,7 +176,7 @@ func completions(ctx *zero.Ctx, uid int64, name, content string, histories []*hi
 		return
 	}
 
-	err = Db.saveHistory(history{
+	err = Db.saveHistory(History{
 		Timestamp:        time.Now().Unix(),
 		Uid:              uid,
 		Name:             name,

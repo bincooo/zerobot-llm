@@ -1,66 +1,66 @@
-package gpt
+package llm
 
 import (
-	"github.com/FloatTech/floatbox/ctxext"
-	sql "github.com/FloatTech/sqlite"
-	zero "github.com/wdvxdr1123/ZeroBot"
-	"github.com/wdvxdr1123/ZeroBot/message"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/FloatTech/floatbox/ctxext"
+	"github.com/wdvxdr1123/ZeroBot/message"
+
+	sql "github.com/FloatTech/sqlite"
+	zero "github.com/wdvxdr1123/ZeroBot"
 )
 
-type db struct {
+type DB struct {
 	sql *sql.Sqlite
 	sync.RWMutex
 }
 
-type key struct {
-	Name    string `db:"name"`
-	Content string `db:"value"`
+type Key struct {
+	Name    string `DB:"name"`
+	Content string `DB:"value"`
 }
 
 type config struct {
-	Timestamp int64  `db:"timestamp"`
-	Proxies   string `db:"proxies"`
-	BaseUrl   string `db:"base_url"`
-	Key       string `db:"key"`
-	Model     string `db:"model"`
-	Imitate   bool   `db:"imitate"` // 模仿模式
-	Freq      int    `db:"freq"`    // 模仿模式自动应答频率0~100
-	PaintUrl  string `db:"paint_url"`
-	PaintKey  string `db:"paint_key"`
+	Timestamp int64  `DB:"timestamp"`
+	Proxies   string `DB:"proxies"`
+	BaseUrl   string `DB:"base_url"`
+	Key       string `DB:"key"`
+	Model     string `DB:"model"`
+	Imitate   bool   `DB:"imitate"` // 模仿模式
+	Freq      int    `DB:"freq"`    // 模仿模式自动应答频率0~100
 }
 
-type history struct {
-	Timestamp int64  `db:"timestamp"`
-	Uid       int64  `db:"uid"`
-	Name      string `db:"name"`
+type History struct {
+	Timestamp int64  `DB:"timestamp"`
+	Uid       int64  `DB:"uid"`
+	Name      string `DB:"name"`
 
-	UserContent      string `db:"user_content"`
-	AssistantContent string `db:"assistant_content"`
+	UserContent      string `DB:"user_content"`
+	AssistantContent string `DB:"assistant_content"`
 }
 
 var (
-	Db = &db{
+	Db = &DB{
 		sql: &sql.Sqlite{},
 	}
 
 	onDb = ctxext.DoOnceOnSuccess(func(ctx *zero.Ctx) bool {
-		Db.sql.DBPath = engine.DataFolder() + "data.db"
+		Db.sql.DBPath = engine.DataFolder() + "data.DB"
 		err := Db.sql.Open(time.Hour * 24)
 		if err != nil {
 			ctx.Send(message.Text("ERROR: ", err))
 			return false
 		}
 
-		err = Db.sql.Create("key", &key{})
+		err = Db.sql.Create("Key", &Key{})
 		if err != nil {
 			ctx.Send(message.Text("ERROR: ", err))
 			return false
 		}
 
-		err = Db.sql.Create("history", &history{})
+		err = Db.sql.Create("History", &History{})
 		if err != nil {
 			ctx.Send(message.Text("ERROR: ", err))
 			return false
@@ -76,74 +76,73 @@ var (
 	})
 )
 
-func (d *db) saveKey(k key) error {
+func (d *DB) saveKey(k Key) error {
 	d.Lock()
 	defer d.Unlock()
-	return d.sql.Insert("key", &k)
+	return d.sql.Insert("Key", &k)
 }
 
-func (d *db) delKey(name string) error {
+func (d *DB) delKey(name string) error {
 	d.Lock()
 	defer d.Unlock()
-	return d.sql.Del("key", "where name = '"+name+"'")
+	return d.sql.Del("Key", "where name = '"+name+"'")
 }
 
-func (d *db) keys() ([]*key, error) {
+func (d *DB) keys() ([]*Key, error) {
 	d.Lock()
 	defer d.Unlock()
-	return sql.FindAll[key](d.sql, "key", "")
+	return sql.FindAll[Key](d.sql, "Key", "")
 }
 
-func (d *db) config() config {
+func (d *DB) config() config {
 	d.Lock()
 	defer d.Unlock()
 	var c = config{
-		Timestamp: time.Now().Unix(),
+		Timestamp: -1,
 		BaseUrl:   "https://api.openai.com",
-		PaintUrl:  "https://api.openai.com",
-		PaintKey:  "",
 		Model:     "gpt-4-turbo",
 		Key:       "auto",
 		Freq:      25,
 	}
-	_ = d.sql.Find("config", &c, "")
+	_ = d.sql.Find("config", &c, "timestamp = -1")
 	return c
 }
 
-func (d *db) updateConfig(c config) error {
+func (d *DB) updateConfig(c config) error {
 	d.Lock()
 	defer d.Unlock()
+	c.Timestamp = -1
 	return d.sql.Insert("config", &c)
 }
 
-func (d *db) saveHistory(h history) error {
+func (d *DB) saveHistory(h History) error {
 	d.Lock()
 	defer d.Unlock()
-	return d.sql.Insert("history", &h)
+	return d.sql.Insert("History", &h)
 }
 
-func (d *db) findHistory(uid int64, name string, count int) ([]*history, error) {
+func (d *DB) findHistory(uid int64, name string, count int) ([]*History, error) {
 	d.Lock()
 	defer d.Unlock()
-	return sql.FindAll[history](d.sql, "history", "where uid = "+strconv.FormatInt(uid, 10)+" and name = '"+name+"' order by timestamp desc limit "+strconv.Itoa(count))
+	return sql.FindAll[History](d.sql, "History", "where uid = "+strconv.FormatInt(uid, 10)+" and name = '"+name+"' order by timestamp desc limit "+strconv.Itoa(count))
 }
 
-func (d *db) cleanHistories(uid int64, name string) error {
+func (d *DB) cleanHistories(uid int64, name string) error {
 	d.Lock()
 	defer d.Unlock()
-	return d.sql.Del("history", "where uid = "+strconv.FormatInt(uid, 10)+" and name = '"+name+"'")
+	return d.sql.Del("History", "where uid = "+strconv.FormatInt(uid, 10)+" and name = '"+name+"'")
 }
 
-func (d *db) cleanAllHistories(name string) error {
+func (d *DB) cleanAllHistories(name string) error {
 	d.Lock()
 	defer d.Unlock()
-	return d.sql.Del("history", "where name = '"+name+"'")
+	return d.sql.Del("History", "where name = '"+name+"'")
 }
 
-func (d *db) key(name string) (*key, error) {
+func (d *DB) key(name string) (*Key, error) {
 	d.Lock()
 	defer d.Unlock()
-	var k key
-	err := d.sql.Find("key", &k, "where name = '"+name+"'")
+	var k Key
+	err := d.sql.Find("Key", &k, "where name = '"+name+"'")
 	return &k, err
 }
