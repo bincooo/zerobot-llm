@@ -104,7 +104,7 @@ func (d *DB) config() config {
 		Key:       "auto",
 		Freq:      25,
 	}
-	_ = d.sql.Find("config", &c, "timestamp = -1")
+	_ = d.sql.Find("config", &c, "")
 	return c
 }
 
