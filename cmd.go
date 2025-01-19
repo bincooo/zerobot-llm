@@ -38,7 +38,7 @@ var (
 	})
 
 	chatMessages map[int64][]cacheMessage
-	fmtMessage   = "TIME: %s\nNAME: \"%s\"\nMESSAGE: \n%s"
+	fmtMessage   = "%s uid为 [ %d ], 昵称为[ %s ] 的群友发送消息: \n%s"
 	messageL     = 10
 	historyL     = 50
 	mu           sync.Mutex
@@ -49,12 +49,13 @@ var (
 
 type cacheMessage struct {
 	time.Time
+	uid      int64
 	nickname string
 	content  string
 }
 
 func (c cacheMessage) String() string {
-	return fmt.Sprintf(fmtMessage, c.Format("2006-01-02 15:04:05"), c.nickname, c.content)
+	return fmt.Sprintf(fmtMessage, c.Format("2006-01-02 15:04:05"), c.uid, c.nickname, c.content)
 }
 
 func init() {
@@ -87,6 +88,7 @@ func init() {
 			mu.Lock()
 			chatMessages[uid] = append(chatMessages[uid], cacheMessage{
 				Time:     time.Now(),
+				uid:      ctx.Event.UserID,
 				nickname: name,
 				content:  plainMessage,
 			})
@@ -200,7 +202,7 @@ func init() {
 					strMessages = append(strMessages, msg.String())
 				}
 			}
-			strMessages = append(strMessages, cacheMessage{now, ctx.CardOrNickName(ctx.Event.UserID), plainMessage}.String())
+			strMessages = append(strMessages, cacheMessage{now, ctx.Event.UserID, ctx.CardOrNickName(ctx.Event.UserID), plainMessage}.String())
 			plainMessage = strings.Join(strMessages, "\n\n")
 		}
 		chatMessages[uid] = nil
