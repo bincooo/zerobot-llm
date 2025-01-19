@@ -20,7 +20,7 @@ import (
 	"github.com/bincooo/go.emoji"
 )
 
-type chatRequest struct {
+type Request struct {
 	ChatId        *string                `json:"chatId"`
 	Vars          map[string]interface{} `json:"variables"`
 	Messages      []map[string]string    `json:"messages"`
@@ -33,7 +33,7 @@ type chatRequest struct {
 	Stream        bool                   `json:"stream"`
 }
 
-type chatResponse struct {
+type Response struct {
 	Id      string   `json:"id"`
 	Object  string   `json:"object"`
 	Created int64    `json:"created"`
@@ -54,15 +54,6 @@ type Choice struct {
 		Content string `json:"content"`
 	} `json:"delta"`
 	FinishReason string `json:"finish_reason"`
-}
-
-type ChatGenRequest struct {
-	Model   string `json:"model"`
-	Prompt  string `json:"prompt"`
-	Quality string `json:"quality"`
-	N       int    `json:"n"`
-	Size    string `json:"size"`
-	Style   string `json:"style"`
 }
 
 var (
@@ -98,7 +89,7 @@ func completions(ctx *zero.Ctx, uid int64, name, content string, histories []*Hi
 		im = c.Imitate
 	}
 
-	payload := chatRequest{
+	payload := Request{
 		// ChatId:      strconv.FormatInt(uid, 10),
 		Vars: map[string]interface{}{
 			"userId":   fmt.Sprintf("%d", ctx.Event.Sender.ID),
@@ -287,7 +278,7 @@ func resolve(response *http.Response, ch chan string) {
 			continue
 		}
 
-		var res chatResponse
+		var res Response
 		data = bytes.TrimPrefix(data, before)
 		if bytes.Equal(data, done) {
 			return
