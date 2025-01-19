@@ -1,4 +1,4 @@
-module github.com/bincooo/gpt
+module github.com/bincooo/zerobot-llm
 
 go 1.21.6
 
