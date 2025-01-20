@@ -177,12 +177,11 @@ func init() {
 		// 限流
 		if time.Now().Before(limit) {
 			logrus.Warnf("当前请求限流: %d", uid)
-			ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text("已限流，请稍后再试..."))
+			//ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text("已限流，请稍后再试..."))
 			return
 		}
 		limiter := limitManager.Load(uid)
 		if !limiter.Acquire() {
-			mu.Unlock()
 			logrus.Warnf("当前请求限流: %d", uid)
 			return
 		}
@@ -252,12 +251,11 @@ func init() {
 		// 限流
 		if time.Now().Before(limit) {
 			logrus.Warnf("当前请求限流: %d", uid)
-			ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text("已限流，请稍后再试..."))
+			//ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text("已限流，请稍后再试..."))
 			return
 		}
 		limiter := limitManager.Load(uid)
 		if !limiter.Acquire() {
-			mu.Unlock()
 			logrus.Warnf("当前请求限流: %d", uid)
 			return
 		}
