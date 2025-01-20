@@ -193,6 +193,11 @@ func init() {
 			return
 		}
 
+		botN := ""
+		if len(zero.BotConfig.NickName) > 0 {
+			botN = fmt.Sprintf("@%s ", zero.BotConfig.NickName[0])
+		}
+
 		mu.Lock()
 		if c.Imitate {
 			strMessages := make([]string, 0)
@@ -202,9 +207,13 @@ func init() {
 					strMessages = append(strMessages, msg.String())
 				}
 			}
-			strMessages = append(strMessages, cacheMessage{now, ctx.Event.UserID, ctx.CardOrNickName(ctx.Event.UserID), plainMessage}.String())
+
+			strMessages = append(strMessages, cacheMessage{now, ctx.Event.UserID, ctx.CardOrNickName(ctx.Event.UserID), botN + plainMessage}.String())
 			plainMessage = strings.Join(strMessages, "\n\n")
+		} else {
+			plainMessage = botN + plainMessage
 		}
+
 		chatMessages[uid] = nil
 		mu.Unlock()
 
